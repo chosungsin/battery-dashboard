@@ -505,13 +505,13 @@ with tab3:
     st.header(t.get('corp_analysis', 'Corporate Analysis'))
     
     # DART API Config
-    DART_API_KEY = "afa9bfe53afd00773ac32f689871b92a"
+    DART_API_KEY = "9ea9ad1afba535b40f4ae92fce3c9730ad5bc6d9"
     corp_mapping = {
-        "LG에너지솔루션": {"dart": "01499263", "ticker": "373220.KS"},
-        "SK아이이테크놀로지": {"dart": "01377855", "ticker": "361610.KS"},
-        "더블유씨피": {"dart": "01185517", "ticker": "393890.KQ"},
-        "에코프로비엠": {"dart": "01117235", "ticker": "247540.KQ"},
-        "포스코퓨처엠": {"dart": "00143890", "ticker": "003670.KS"}
+        "LG에너지솔루션": {"dart": "01515323", "ticker": "373220.KS"},
+        "SK아이이테크놀로지": {"dart": "01386916", "ticker": "361610.KS"},
+        "더블유씨피": {"dart": "01291317", "ticker": "393890.KQ"},
+        "에코프로비엠": {"dart": "01160363", "ticker": "247540.KQ"},
+        "포스코퓨처엠": {"dart": "00155276", "ticker": "003670.KS"}
     }
     
     selected_corp = st.selectbox(t.get('corp_select', 'Select Company'), list(corp_mapping.keys()))
