@@ -507,11 +507,13 @@ with tab3:
     # DART API Config
     DART_API_KEY = "9ea9ad1afba535b40f4ae92fce3c9730ad5bc6d9"
     corp_mapping = {
-        "LG에너지솔루션": {"dart": "01515323", "ticker": "373220.KS"},
-        "SK아이이테크놀로지": {"dart": "01386916", "ticker": "361610.KS"},
-        "더블유씨피": {"dart": "01291317", "ticker": "393890.KQ"},
-        "에코프로비엠": {"dart": "01160363", "ticker": "247540.KQ"},
-        "포스코퓨처엠": {"dart": "00155276", "ticker": "003670.KS"}
+        "[배터리] LG에너지솔루션": {"dart": "01515323", "ticker": "373220.KS"},
+        "[배터리] 삼성SDI": {"dart": "00126362", "ticker": "006400.KS"},
+        "[배터리] SK이노베이션": {"dart": "00631518", "ticker": "096770.KS"},
+        "[분리막] SK아이이테크놀로지": {"dart": "01386916", "ticker": "361610.KS"},
+        "[분리막] 더블유씨피": {"dart": "01291317", "ticker": "393890.KQ"},
+        "[양극재] 에코프로비엠": {"dart": "01160363", "ticker": "247540.KQ"},
+        "[양극재] 포스코퓨처엠": {"dart": "00155276", "ticker": "003670.KS"}
     }
     
     selected_corp = st.selectbox(t.get('corp_select', 'Select Company'), list(corp_mapping.keys()))
