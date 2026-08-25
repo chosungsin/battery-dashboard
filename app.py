@@ -600,20 +600,20 @@ with tab3:
 with tab4:
     st.header(t.get('tab4', '🚢 해상 물류 모니터링'))
     st.markdown("글로벌 이차전지 및 분리막 수출입 물동량을 모니터링하기 위한 실시간 선박 위치(ShipFinder) 정보입니다.")
-    st.markdown("🔒 **로그인이 필요하신 경우 아래 버튼을 눌러 새 창에서 진행해 주세요.** (보안 정책상 대시보드 내부에서는 로그인이 차단될 수 있습니다.)")
-    st.markdown('<a href="https://www.shipfinder.com" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">🚢 ShipFinder 새 창에서 열기</a>', unsafe_allow_html=True)
-    st.write("") # spacing
+    st.markdown("🔒 **무료/로그인 없이** 이용 가능한 **VesselFinder** 기반으로 지도를 교체했습니다.")
     
-    shipfinder_iframe = '''
-    <iframe 
-      width="100%" 
-      height="600" 
-      style="border:0;" 
-      loading="lazy" 
-      allowfullscreen 
-      referrerpolicy="no-referrer-when-downgrade"
-      src="https://www.shipfinder.com/embed/your-ship-or-route-id">
-    </iframe>
-    '''
+    vesselfinder_html = """
+    <div style="width: 100%; height: 600px;">
+        <script type="text/javascript">
+            var width="100%";
+            var height="600";
+            var names=true;
+            var lat=35.0;
+            var lon=129.0;
+            var zoom=5;
+        </script>
+        <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+    </div>
+    """
     import streamlit.components.v1 as components
-    components.html(shipfinder_iframe, height=620)
+    components.html(vesselfinder_html, height=620)
