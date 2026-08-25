@@ -600,33 +600,43 @@ with tab3:
 with tab4:
     st.header(t.get('tab4', '🚢 해상 물류 모니터링'))
     st.markdown("글로벌 이차전지 및 분리막 수출입 물동량을 모니터링하기 위한 실시간 선박 위치(ShipFinder) 정보입니다.")
-    st.markdown("🔒 **무료/로그인 없이** 이용 가능한 **VesselFinder** 기반으로 지도를 교체했습니다.")
+    st.markdown("🔒 **ShipFinder** 데이터 정합성을 위해 원복하였습니다. (로그인이 필요한 경우 [새 창에서 열기](https://www.shipfinder.com)를 이용해 주세요)")
     
     col1, col2 = st.columns([2, 1])
     with col1:
-        search_vessel = st.text_input("🔍 선박 고유번호 (IMO 또는 MMSI) 검색", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
+        search_vessel = st.text_input("🔍 선박 고유번호 (IMO/MMSI) 또는 항로 ID 검색", placeholder="예: 440381000")
     
-    mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
+    # 1. ShipFinder Iframe (ETA 및 선박 추적)
+    shipfinder_src = f"https://www.shipfinder.com/embed/{search_vessel}" if search_vessel else "https://www.shipfinder.com/embed/"
     
-    if search_vessel:
-        search_vessel = search_vessel.strip()
-        if len(search_vessel) == 9 and search_vessel.isdigit():
-            mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
-        elif len(search_vessel) == 7 and search_vessel.isdigit():
-            mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
-        else:
-            st.warning("유효한 9자리 MMSI 번호 또는 7자리 IMO 번호를 입력해 주세요. (예: HMM Algeciras 호 = IMO 9863297)")
-
-    vesselfinder_html = f"""
-    <div style="width: 100%; height: 600px;">
-        <script type="text/javascript">
-            var width="100%";
-            var height="600";
-            var names=true;
-            {mmsi_script}
-        </script>
-        <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+    shipfinder_html = f"""
+    <div style="margin-bottom: 20px;">
+        <h4 style="font-family: sans-serif; margin-bottom: 10px;">🚢 실시간 선박 위치 & ETA (ShipFinder)</h4>
+        <iframe 
+          width="100%" 
+          height="500" 
+          style="border:0;" 
+          loading="lazy" 
+          allowfullscreen 
+          referrerpolicy="no-referrer-when-downgrade"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
+          src="{shipfinder_src}">
+        </iframe>
     </div>
     """
+    
+    # 2. Windy Iframe (바다 날씨 및 파도 예측)
+    windy_html = """
+    <div>
+        <h4 style="font-family: sans-serif; margin-bottom: 10px;">🌊 바다 날씨 및 풍랑 예측 (Windy)</h4>
+        <iframe 
+            width="100%" 
+            height="400" 
+            src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=kt&zoom=4&overlay=waves&product=ecmwf&level=surface&lat=35.0&lon=129.0" 
+            frameborder="0">
+        </iframe>
+    </div>
+    """
+    
     import streamlit.components.v1 as components
-    components.html(vesselfinder_html, height=620)
+    components.html(shipfinder_html + windy_html, height=1000, scrolling=True)
