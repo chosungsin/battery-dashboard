@@ -602,15 +602,28 @@ with tab4:
     st.markdown("글로벌 이차전지 및 분리막 수출입 물동량을 모니터링하기 위한 실시간 선박 위치(ShipFinder) 정보입니다.")
     st.markdown("🔒 **무료/로그인 없이** 이용 가능한 **VesselFinder** 기반으로 지도를 교체했습니다.")
     
-    vesselfinder_html = """
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        search_vessel = st.text_input("🔍 선박 고유번호 (IMO 또는 MMSI) 검색", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
+    
+    mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
+    
+    if search_vessel:
+        search_vessel = search_vessel.strip()
+        if len(search_vessel) == 9 and search_vessel.isdigit():
+            mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
+        elif len(search_vessel) == 7 and search_vessel.isdigit():
+            mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
+        else:
+            st.warning("유효한 9자리 MMSI 번호 또는 7자리 IMO 번호를 입력해 주세요. (예: HMM Algeciras 호 = IMO 9863297)")
+
+    vesselfinder_html = f"""
     <div style="width: 100%; height: 600px;">
         <script type="text/javascript">
             var width="100%";
             var height="600";
             var names=true;
-            var lat=35.0;
-            var lon=129.0;
-            var zoom=5;
+            {mmsi_script}
         </script>
         <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
     </div>
