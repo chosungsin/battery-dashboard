@@ -54,6 +54,7 @@ locales = {
         'tab1': '📋 일간 경제지표 데이터',
         'tab2': '📊 월간/분기 지표 데이터',
         'tab3': '🏢 기업 재무/공시 분석',
+        'tab4': '🚢 해상 물류 모니터링',
         'corp_analysis': '이차전지/분리막 핵심 기업 분석',
         'corp_select': '분석할 기업 선택',
         'col_base': '기준금리',
@@ -118,6 +119,7 @@ locales = {
         'tab1': '📋 Daily Indicators',
         'tab2': '📊 Monthly/Quarterly Indicators',
         'tab3': '🏢 Corporate Analysis',
+        'tab4': '🚢 Maritime Logistics',
         'corp_analysis': 'Battery & Separator Corporate Analysis',
         'corp_select': 'Select Company',
         'col_base': 'Base Rate',
@@ -182,6 +184,7 @@ locales = {
         'tab1': '📋 日次データ',
         'tab2': '📊 月次/四半期データ',
         'tab3': '🏢 企業財務/公示分析',
+        'tab4': '🚢 海上物流モニタリング',
         'corp_analysis': '二次電池/セパレーター中核企業分析',
         'corp_select': '分析する企業を選択',
         'col_base': '基準金利',
@@ -486,7 +489,7 @@ if not df_daily.empty:
         st.plotly_chart(fig_detail, use_container_width=True, config=plotly_config)
 
     st.markdown("---")
-    tab1, tab2, tab3 = st.tabs([t['tab1'], t['tab2'], t.get('tab3', 'Tab 3')])
+    tab1, tab2, tab3, tab4 = st.tabs([t['tab1'], t['tab2'], t.get('tab3', 'Tab 3'), t.get('tab4', 'Tab 4')])
     
     with tab1:
         daily_cols = ['date', t['col_base'], t['col_fx'], t['col_ktb3'], t['col_ktb10'], t['col_jpy']]
@@ -592,3 +595,25 @@ with tab3:
                 
         df_disc = fetch_dart_disclosures(corp_info['dart'])
         st.dataframe(df_disc, use_container_width=True, hide_index=True)
+
+
+with tab4:
+    st.header(t.get('tab4', '🚢 해상 물류 모니터링'))
+    st.markdown("글로벌 이차전지 및 분리막 수출입 물동량을 모니터링하기 위한 실시간 선박 위치(ShipFinder) 정보입니다.")
+    st.markdown("🔒 **로그인이 필요하신 경우 아래 버튼을 눌러 새 창에서 진행해 주세요.** (보안 정책상 대시보드 내부에서는 로그인이 차단될 수 있습니다.)")
+    st.markdown('<a href="https://www.shipfinder.com" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">🚢 ShipFinder 새 창에서 열기</a>', unsafe_allow_html=True)
+    st.write("") # spacing
+    
+    shipfinder_iframe = '''
+    <iframe 
+      width="100%" 
+      height="600" 
+      style="border:0;" 
+      loading="lazy" 
+      allowfullscreen 
+      referrerpolicy="no-referrer-when-downgrade"
+      src="https://www.shipfinder.com/embed/your-ship-or-route-id">
+    </iframe>
+    '''
+    import streamlit.components.v1 as components
+    components.html(shipfinder_iframe, height=620)
