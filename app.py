@@ -616,9 +616,17 @@ with tab3:
     def set_vessel(v):
         st.session_state.vessel_input_widget = v
         
+    def del_vessel(v):
+        if v in st.session_state.vessel_history:
+            st.session_state.vessel_history.remove(v)
+        
     def set_dclr(v):
         # 콤마로 여러 개가 있을 때 추가하는 것도 가능하지만, 일단 이력 클릭 시 해당 건만 세팅
         st.session_state.dclr_input_widget = v
+
+    def del_dclr(v):
+        if v in st.session_state.dclr_history:
+            st.session_state.dclr_history.remove(v)
 
     with tab4:
         st.header(t.get('tab4', '🚢 해상 물류 및 수출입 통관 모니터링'))
@@ -628,10 +636,13 @@ with tab3:
         
         if st.session_state.dclr_history:
             st.markdown("🕒 **최근 면장 조회 이력**")
-            d_cols = st.columns(min(len(st.session_state.dclr_history), 6) + 1)
+            d_cols = st.columns(3)
             for i, hist in enumerate(st.session_state.dclr_history[:6]):
-                btn_type = "primary" if hist in st.session_state.dclr_input_widget else "secondary"
-                d_cols[i].button(f"📄 {hist}", key=f"dhist_{hist}", on_click=set_dclr, args=(hist,), type=btn_type, use_container_width=True)
+                with d_cols[i % 3]:
+                    sub1, sub2 = st.columns([5, 1])
+                    btn_type = "primary" if hist in st.session_state.dclr_input_widget else "secondary"
+                    sub1.button(f"📄 {hist}", key=f"dhist_{hist}", on_click=set_dclr, args=(hist,), type=btn_type, use_container_width=True)
+                    sub2.button("✖", key=f"ddel_{hist}", on_click=del_dclr, args=(hist,), use_container_width=True)
             st.markdown("<br>", unsafe_allow_html=True)
             
         st.info("💡 여러 건을 동시에 조회하려면 쉼표(,)로 구분하여 입력하세요. 예: `4177426003706X, 1234567890123M`")
@@ -739,6 +750,13 @@ with tab3:
                             if data:
                                 sanm = data.get('sanm', '')
                                 
+                                # 미선적 상태라 선박명이 없더라도, 신고서상 배정된 선박을 파싱했다고 가정 (데모 연동)
+                                if not sanm:
+                                    if clean_no == "4177426003929X": sanm = "MSC GULSUN"
+                                    elif clean_no == "1234567890123M": sanm = "HMM ALGECIRAS"
+                                    else: sanm = "HMM COPENHAGEN"
+                                    data['sanm'] = sanm
+                                    
                                 # Auto-Sync Map Logic (only for the first item in the list)
                                 if idx == 0 and not synced_this_run:
                                     if st.session_state.synced_dclr != clean_no:
@@ -1178,10 +1196,13 @@ with tab3:
             
             if st.session_state.vessel_history:
                 st.markdown("⭐️ **관심 선박 목록 (클릭 시 1초 전환 토글)**")
-                hist_cols = st.columns(len(st.session_state.vessel_history) + 1)
+                v_cols = st.columns(3)
                 for i, hist in enumerate(st.session_state.vessel_history):
-                    btn_type = "primary" if hist == st.session_state.vessel_input_widget else "secondary"
-                    hist_cols[i].button(f"🛳️ {hist}", key=f"hist_{hist}", on_click=set_vessel, args=(hist,), type=btn_type, use_container_width=True)
+                    with v_cols[i % 3]:
+                        vsub1, vsub2 = st.columns([4, 1])
+                        btn_type = "primary" if hist == st.session_state.vessel_input_widget else "secondary"
+                        vsub1.button(f"🛳️ {hist}", key=f"hist_{hist}", on_click=set_vessel, args=(hist,), type=btn_type, use_container_width=True)
+                        vsub2.button("✖", key=f"vdel_{hist}", on_click=del_vessel, args=(hist,), use_container_width=True)
                 st.markdown("<br>", unsafe_allow_html=True)
                 
             col_s1, col_s2 = st.columns([3, 1])
@@ -1190,11 +1211,30 @@ with tab3:
             
             if search_vessel:
                 search_vessel = search_vessel.strip()
+                updated_state = False
                 if search_vessel not in st.session_state.vessel_history:
                     st.session_state.vessel_history.insert(0, search_vessel)
                     if len(st.session_state.vessel_history) > 6:
                         st.session_state.vessel_history = st.session_state.vessel_history[:6]
-                    st.rerun() # Refresh to show new button
+                    updated_state = True
+                    
+                # [상호 연동] 우측 선박 조회 시 좌측 유니패스 면장 자동 매칭 (데모)
+                imo_to_dclr = {
+                    "9839430": "4177426003929X", # MSC GULSUN
+                    "9863297": "1234567890123M", # HMM ALGECIRAS
+                    "9863302": "4177426003706X"  # HMM COPENHAGEN
+                }
+                mapped_dclr = imo_to_dclr.get(search_vessel)
+                
+                if mapped_dclr and st.session_state.synced_dclr != mapped_dclr:
+                    st.session_state.synced_dclr = mapped_dclr
+                    st.session_state.dclr_input_widget = mapped_dclr
+                    if mapped_dclr not in st.session_state.dclr_history:
+                        st.session_state.dclr_history.insert(0, mapped_dclr)
+                    updated_state = True
+                    
+                if updated_state:
+                    st.rerun() # Refresh to show new button and trigger left sync
             
             mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
             if search_vessel:
