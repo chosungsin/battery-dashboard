@@ -843,9 +843,11 @@ with tab3:
                                         .step {{ display: flex; flex-direction: column; align-items: center; width: 33%; }}
                                         .step-icon {{ width: 32px; height: 32px; border-radius: 50%; background: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-bottom: 12px; border: 4px solid white; box-shadow: 0 0 0 1px #e2e8f0; }}
                                         .step-icon.delayed {{ background: #ef4444; }}
+                                        .step-icon.pending {{ background: #94a3b8; }}
                                         .step-title {{ font-weight: 700; font-size: 11px; margin-bottom: 6px; text-align: center; word-break: keep-all; }}
                                         .step-date {{ background: #d1fae5; color: #047857; padding: 3px 8px; border-radius: 20px; font-size: 10px; border: 1px solid #a7f3d0; text-align: center; word-break: keep-all; }}
                                         .step-date.delayed {{ background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }}
+                                        .step-date.pending {{ background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }}
                                         
                                         /* Info Pills */
                                         .pills-container {{ display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }}
@@ -914,10 +916,12 @@ with tab3:
                                             table.history-table td {{ color: #cbd5e1; border-bottom: 1px solid #334155; }}
                                             .timeline-line {{ background: #334155; }}
                                             .step-icon {{ box-shadow: 0 0 0 1px #334155; border-color: #1e293b; color: #fff; }}
+                                            .step-icon.pending {{ background: #475569; }}
                                             .step-title {{ color: #e2e8f0; }}
                                             .step-date {{ background: #064e3b; color: #a7f3d0; border-color: #065f46; }}
                                             .card-divider {{ border-color: #475569 !important; }}
                                             .step-date.delayed {{ background: #7f1d1d; color: #fecaca; border-color: #991b1b; }}
+                                            .step-date.pending {{ background: #1e293b; color: #94a3b8; border-color: #334155; }}
                                             .count-badge {{ background: #334155; border-color: #475569; color: #cbd5e1; }}
                                             .pill-gray {{ background: #334155; border-color: #475569; color: #cbd5e1; }}
                                             .pill-yellow {{ background: #422006; border-color: #78350f; color: #fde68a; }}
@@ -1001,7 +1005,7 @@ with tab3:
                                                 </tr>
                                                 <tr>
                                                     <td style="color:#94a3b8;">3</td>
-                                                    <td style="font-weight:600;">{'양하 완료 (Cargo Discharged)' if is_import else '선적 완료 (Cargo Loaded)'}</td>
+                                                    <td style="font-weight:600;">{'양하 (Cargo Discharging)' if is_import else '선적 (Cargo Loading)'}</td>
                                                     <td style="font-family:monospace;">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (예정)"}</td>
                                                     <td style="color:#64748b;">{pol_desc} / {data.get('sanm', '미상')}</td>
                                                     <td>
