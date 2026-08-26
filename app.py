@@ -627,6 +627,16 @@ with tab3:
     def set_vessel(v):
         st.session_state.search_vessel_input = v
 
+    
+    # 선박 검색 이력 세션 상태 초기화
+    if 'vessel_history' not in st.session_state:
+        st.session_state.vessel_history = []
+    if 'search_vessel_input' not in st.session_state:
+        st.session_state.search_vessel_input = ""
+
+    def set_vessel(v):
+        st.session_state.search_vessel_input = v
+
     with tab4:
         st.header(t.get('tab4', '🚢 해상 물류 및 수출입 통관 모니터링'))
         
@@ -695,10 +705,28 @@ with tab3:
         if dclr_no:
             import requests
             import xml.etree.ElementTree as ET
-            
-            clean_no = dclr_no.replace("-", "").strip()
+            from datetime import datetime
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            
+            def get_realtime_eta(query):
+                from bs4 import BeautifulSoup
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                try:
+                    res = requests.get(f"https://www.vesselfinder.com/vessels?name={query}", headers=headers, timeout=5)
+                    soup = BeautifulSoup(res.text, 'html.parser')
+                    link = soup.select_one('a.ship-link')
+                    if not link: return None
+                    detail_url = f"https://www.vesselfinder.com{link.get('href')}"
+                    res2 = requests.get(detail_url, headers=headers, timeout=5)
+                    soup2 = BeautifulSoup(res2.text, 'html.parser')
+                    eta_span = soup2.find(string=re.compile(r'ETA:'))
+                    if eta_span: return eta_span.strip()
+                except:
+                    pass
+                return None
+            
+            clean_no = dclr_no.replace("-", "").strip()
             
             with st.spinner("유니패스 데이터를 실시간 조회 중입니다..."):
                 unipass_key = "o260d286z008x204x010n090j2"
@@ -728,10 +756,43 @@ with tab3:
                                 acpt_dt_formatted = f"{acpt_dt_formatted[:4]}-{acpt_dt_formatted[4:6]}-{acpt_dt_formatted[6:8]} 09:40"
                                 
                             load_tmlm = data['loadDtyTmlm']
+                            load_date_obj = None
                             if len(load_tmlm) == 8:
-                                load_tmlm = f"{load_tmlm[:4]}-{load_tmlm[4:6]}-{load_tmlm[6:8]}"
+                                try:
+                                    load_date_obj = datetime.strptime(load_tmlm, "%Y%m%d")
+                                    load_tmlm = f"{load_tmlm[:4]}-{load_tmlm[4:6]}-{load_tmlm[6:8]}"
+                                except:
+                                    pass
                                 
                             is_loaded = data['shpmCmplYn'] == 'Y'
+                            
+                            # Real-time ETA Scrape
+                            query_term = search_vessel if search_vessel else data.get('sanm')
+                            vf_eta_str = None
+                            vf_dt = None
+                            if query_term:
+                                vf_eta_str = get_realtime_eta(query_term)
+                                if vf_eta_str:
+                                    try:
+                                        clean_str = vf_eta_str.replace("ETA:", "").strip()
+                                        current_year = datetime.now().year
+                                        vf_dt = datetime.strptime(f"{current_year} {clean_str}", "%Y %b %d, %H:%M")
+                                    except:
+                                        pass
+                            
+                            # Compare ETAs
+                            final_eta_display = f"{load_tmlm} (서류상 적재/도착 기한)"
+                            eta_warning_html = ""
+                            is_delayed = False
+                            
+                            if vf_dt and load_date_obj:
+                                if vf_dt > load_date_obj:
+                                    is_delayed = True
+                                    final_eta_display = f"{vf_dt.strftime('%Y년 %m월 %d일 %H:%M')} (VesselFinder 실시간 ETA 적용)"
+                                    eta_warning_html = '<br><span style="color:#ef4444; font-size:12px; font-weight:bold;">⚠️ 서류상 일정보다 지연됨</span>'
+                                else:
+                                    final_eta_display = f"{vf_dt.strftime('%Y년 %m월 %d일 %H:%M')} (VesselFinder 실시간 ETA 적용)"
+                                    eta_warning_html = '<br><span style="color:#10b981; font-size:12px; font-weight:bold;">✅ 기한 내 정상 도착 예정</span>'
                             
                             html_content = f"""
                             <!DOCTYPE html>
@@ -755,8 +816,10 @@ with tab3:
                                     .timeline-steps {{ display: flex; justify-content: space-between; position: relative; z-index: 2; }}
                                     .step {{ display: flex; flex-direction: column; align-items: center; width: 33%; }}
                                     .step-icon {{ width: 32px; height: 32px; border-radius: 50%; background: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-bottom: 12px; border: 4px solid white; box-shadow: 0 0 0 1px #e2e8f0; }}
+                                    .step-icon.delayed {{ background: #ef4444; }}
                                     .step-title {{ font-weight: 700; font-size: 14px; margin-bottom: 6px; }}
                                     .step-date {{ background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 20px; font-size: 12px; border: 1px solid #a7f3d0; }}
+                                    .step-date.delayed {{ background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }}
                                     
                                     /* Info Pills */
                                     .pills-container {{ display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }}
@@ -769,13 +832,14 @@ with tab3:
                                     /* Table */
                                     table.history-table {{ width: 100%; border-collapse: collapse; }}
                                     table.history-table th {{ padding: 16px; text-align: left; font-size: 13px; color: #64748b; border-bottom: 2px solid #e2e8f0; font-weight: 600; }}
-                                    table.history-table td {{ padding: 20px 16px; font-size: 14px; color: #334155; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }}
+                                    table.history-table td {{ padding: 20px 16px; font-size: 14px; color: #334155; vertical-align: middle; border-bottom: 1px solid #f1f5f9; line-height: 1.4; }}
                                     table.history-table tr.row-blue {{ background-color: #eff6ff; }}
                                     table.history-table tr.row-green {{ background-color: #f0fdf4; }}
+                                    table.history-table tr.row-red {{ background-color: #fef2f2; }}
                                     
-                                    .status-complete {{ display: inline-flex; flex-direction: column; align-items: center; background: #d1fae5; color: #047857; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #a7f3d0; font-weight: bold; line-height: 1.2; }}
-                                    .status-complete i {{ margin-bottom: 2px; }}
-                                    .status-pending {{ display: inline-flex; flex-direction: column; align-items: center; background: #fef3c7; color: #d97706; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #fde68a; font-weight: bold; line-height: 1.2; }}
+                                    .status-complete {{ display: inline-flex; flex-direction: column; align-items: center; background: #d1fae5; color: #047857; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #a7f3d0; font-weight: bold; }}
+                                    .status-pending {{ display: inline-flex; flex-direction: column; align-items: center; background: #fef3c7; color: #d97706; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #fde68a; font-weight: bold; }}
+                                    .status-delayed {{ display: inline-flex; flex-direction: column; align-items: center; background: #fee2e2; color: #b91c1c; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #fecaca; font-weight: bold; }}
                                     
                                     /* View Document Badge */
                                     .badge-view {{
@@ -783,7 +847,7 @@ with tab3:
                                         background: #6366f1; color: white; border-radius: 20px; padding: 8px 16px;
                                         font-size: 12px; font-weight: bold; cursor: pointer; margin-left: 10px;
                                         box-shadow: 0 4px 10px rgba(99,102,241,0.3); transition: transform 0.2s;
-                                        line-height: 1.2; vertical-align: middle;
+                                        vertical-align: middle;
                                     }}
                                     .badge-view:hover {{ transform: scale(1.05); }}
                                     .badge-view i {{ font-size: 16px; margin-bottom: 2px; }}
@@ -828,9 +892,9 @@ with tab3:
                                                 <div class="step-date">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (출항 예정)"}</div>
                                             </div>
                                             <div class="step">
-                                                <div class="step-icon" style="background:{'#10b981' if is_loaded else '#cbd5e1'};"><i class="fa-solid fa-check"></i></div>
-                                                <div class="step-title">해외 목적항 (추정)</div>
-                                                <div class="step-date">2026년 8월 25일 (항로 추정 ETA)</div>
+                                                <div class="step-icon {'delayed' if is_delayed else ''}" style="background:{'#ef4444' if is_delayed else '#10b981' if is_loaded else '#cbd5e1'};"><i class="fa-solid {'fa-triangle-exclamation' if is_delayed else 'fa-check'}"></i></div>
+                                                <div class="step-title" style="color:{'#ef4444' if is_delayed else 'inherit'}">해외 목적항 (추정)</div>
+                                                <div class="step-date {'delayed' if is_delayed else ''}">{final_eta_display}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -855,11 +919,11 @@ with tab3:
                                         <thead>
                                             <tr>
                                                 <th style="width:5%">#</th>
-                                                <th style="width:30%">처리 단계</th>
-                                                <th style="width:25%">처리 일시</th>
+                                                <th style="width:28%">처리 단계</th>
+                                                <th style="width:28%">처리 일시</th>
                                                 <th style="width:20%">처리 장소</th>
                                                 <th style="width:8%">상태</th>
-                                                <th style="width:12%">비고</th>
+                                                <th style="width:11%">비고</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -892,18 +956,18 @@ with tab3:
                                                 </td>
                                                 <td></td>
                                             </tr>
-                                            <tr class="row-green">
+                                            <tr class="{'row-red' if is_delayed else 'row-green'}">
                                                 <td style="color:#94a3b8;">4</td>
-                                                <td style="font-weight:700; color:#047857;"><span style="color:#10b981; font-size:18px; margin-right:5px;">●</span>목적항 도착 예정 — 해외 목적항 (추정)</td>
-                                                <td style="font-family:monospace;">2026년 8월 25일 (항로 추정 ETA)</td>
+                                                <td style="font-weight:700; color:{'#ef4444' if is_delayed else '#047857'};"><span style="color:{'#ef4444' if is_delayed else '#10b981'}; font-size:18px; margin-right:5px;">●</span>목적항 도착 예정 — 해외 목적항 (추정)</td>
+                                                <td style="font-family:monospace;">{final_eta_display} {eta_warning_html}</td>
                                                 <td style="color:#64748b;">해외 목적항 (추정)</td>
-                                                <td><div class="status-complete" style="background:transparent; border:none;"><i class="fa-solid fa-check" style="color:#10b981;"></i>완료</div></td>
+                                                <td>{ '<div class="status-delayed"><i class="fa-solid fa-triangle-exclamation"></i>지연</div>' if is_delayed else '<div class="status-complete" style="background:transparent; border:none;"><i class="fa-solid fa-check" style="color:#10b981;"></i>완료</div>' }</td>
                                                 <td></td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
-                                <div class="footer-text">※ 출처: 관세청 유니패스(UNI-PASS) 실시간 조회 데이터 · 최종 단계가 현재 처리 상태입니다.</div>
+                                <div class="footer-text">※ 출처: 관세청 유니패스(UNI-PASS) 및 VesselFinder 실시간 조회 데이터 · 최종 단계가 현재 처리 상태입니다.</div>
 
                                 <!-- The Modal -->
                                 <div id="myModal" class="modal" onclick="closeModalOutside(event)">
@@ -913,8 +977,8 @@ with tab3:
                                             <button class="btn-pdf" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF 다운로드</button>
                                             <button class="btn-print" onclick="printForm()"><i class="fa-solid fa-print"></i> 인쇄하기</button>
                                             <div style="margin-left:auto; display:flex; gap:10px;">
-                                                <button onclick="alert('관세청 API 보안 정책상 상업송장(Invoice) 원본은 전송되지 않습니다. [문서 업로드] 기능을 통해 직접 첨부해주세요.')" style="background:#f1f5f9; color:#475569; padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">📄 인보이스(CI) 원본 보기</button>
-                                                <button onclick="alert('관세청 API 보안 정책상 패킹리스트(P/L) 원본은 전송되지 않습니다. [문서 업로드] 기능을 통해 직접 첨부해주세요.')" style="background:#f1f5f9; color:#475569; padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">📦 패킹리스트(PL) 원본 보기</button>
+                                                <button onclick="alert('💡 관세청 API 보안 정책상 상업송장(Invoice) 스캔 원본 파일은 외부로 제공되지 않습니다. 대신, 화면의 정보는 관세청에 신고된 데이터와 동일함을 보증합니다.')" style="background:#f1f5f9; color:#475569; padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">📄 인보이스(CI) 원본 보기</button>
+                                                <button onclick="alert('💡 관세청 API 보안 정책상 패킹리스트(P/L) 스캔 원본 파일은 외부로 제공되지 않습니다. 상세 패킹 내역은 하단의 포장수량({data['csclPckUt']}) 정보를 참조해주세요.')" style="background:#f1f5f9; color:#475569; padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">📦 패킹리스트(PL) 원본 보기</button>
                                             </div>
                                         </div>
                                         
@@ -1005,7 +1069,7 @@ with tab3:
                             </body>
                             </html>
                             """
-                            components.html(html_content, height=1200, scrolling=True)
+                            components.html(html_content, height=1300, scrolling=True)
                             
                     else:
                         st.error("❌ 해당 번호로 조회된 통관 데이터가 없습니다. 번호를 다시 확인해 주세요.")
