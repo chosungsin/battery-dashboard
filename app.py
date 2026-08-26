@@ -489,7 +489,7 @@ if not df_daily.empty:
         st.plotly_chart(fig_detail, use_container_width=True, config=plotly_config)
 
     st.markdown("---")
-    tab1, tab2, tab3, tab4 = st.tabs([t['tab1'], t['tab2'], t.get('tab3', 'Tab 3'), t.get('tab4', 'Tab 4')])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([t['tab1'], t['tab2'], t.get('tab3', 'Tab 3'), t.get('tab4', 'Tab 4'), '🇺🇸 미국 수출 관세율 및 정책 동향'])
     
     with tab1:
         daily_cols = ['date', t['col_base'], t['col_fx'], t['col_ktb3'], t['col_ktb10'], t['col_jpy']]
@@ -1186,3 +1186,101 @@ with tab3:
                         st.error(f"⚠️ 유니패스 API 통신 오류 ({clean_no}): {e}")
                 except Exception as e:
                     st.error(f"⚠️ 유니패스 API 통신 오류: {e}")
+
+
+with tab5:
+    st.header("🇺🇸 미국 이차전지 부품 수출 관세율 변동 추이")
+    st.markdown("미국으로 수출되는 이차전지 부품(HS Code 8507.90 등)에 대한 국가별 적용 관세율 비교 및 정책 동향입니다. 한국은 한-미 FTA 발효 이후 무관세 혜택을 누리고 있는 반면, 중국산 부품은 무역법 301조에 따른 제재 관세가 부과되고 있습니다.")
+    
+    import plotly.graph_objects as go
+    import pandas as pd
+    
+    # 데이터 준비
+    years = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
+    korea_rates = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    china_rates = [3.4, 10.9, 10.9, 10.9, 10.9, 10.9, 28.4, 28.4, 28.4]
+    
+    df_tariff = pd.DataFrame({
+        'Year': years,
+        'Korea (KORUS FTA)': korea_rates,
+        'China (MFN + Sec. 301)': china_rates
+    })
+    
+    fig = go.Figure()
+    
+    # 한국산 관세율 라인
+    fig.add_trace(go.Scatter(
+        x=df_tariff['Year'], y=df_tariff['Korea (KORUS FTA)'],
+        mode='lines+markers+text',
+        name='한국산 (무관세 적용)',
+        line=dict(color='#10b981', width=4),
+        marker=dict(size=10),
+        text=[f"{r}%" for r in korea_rates],
+        textposition="bottom center",
+        textfont=dict(color='#10b981', size=12, weight='bold')
+    ))
+    
+    # 중국산 관세율 라인
+    fig.add_trace(go.Scatter(
+        x=df_tariff['Year'], y=df_tariff['China (MFN + Sec. 301)'],
+        mode='lines+markers+text',
+        name='중국산 (제재관세 부과)',
+        line=dict(color='#ef4444', width=4, dash='dot'),
+        marker=dict(size=10),
+        text=[f"{r}%" for r in china_rates],
+        textposition="top center",
+        textfont=dict(color='#ef4444', size=12, weight='bold')
+    ))
+    
+    # 주요 이벤트 주석 추가 (IRA, 301조 인상)
+    fig.add_annotation(
+        x=2022, y=5,
+        text="<b>IRA 법안 통과 (2022)</b><br>공급망 탈중국 가속화",
+        showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#64748b",
+        ax=0, ay=-40,
+        bgcolor="#f1f5f9", bordercolor="#cbd5e1", borderwidth=1, borderpad=4
+    )
+    
+    fig.add_annotation(
+        x=2024, y=28.4,
+        text="<b>무역법 301조 제재 인상 (2024)</b><br>배터리 부품 관세 25% 추가 부과",
+        showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#ef4444",
+        ax=-20, ay=-60,
+        bgcolor="#fef2f2", bordercolor="#fca5a5", borderwidth=1, borderpad=4
+    )
+    
+    fig.update_layout(
+        title="이차전지 부품(HS 8507.90) 미국 수입 관세율 변동 추이",
+        xaxis_title="연도",
+        yaxis_title="관세율 (%)",
+        yaxis=dict(range=[-5, 40], ticksuffix="%"),
+        xaxis=dict(tickmode='linear', tick0=2018, dtick=1),
+        plot_bgcolor="white",
+        hovermode="x unified",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(t=80, b=50, l=50, r=50)
+    )
+    
+    # Grid lines
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#f1f5f9')
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#f1f5f9')
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # 하단 인사이트 카드
+    st.markdown("""
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 20px;">
+        <h4 style="margin-top: 0; color: #0f172a;"><i class="fa-solid fa-lightbulb" style="color: #f59e0b; margin-right: 8px;"></i> 주요 시사점 및 수출 전략</h4>
+        <ul style="color: #334155; line-height: 1.6; margin-bottom: 0;">
+            <li><b>원가 경쟁력 확보:</b> 한국산 배터리 부품은 한미 FTA에 따라 <b>0% 무관세 혜택</b>을 지속적으로 유지하고 있어, 25% 이상의 고율 관세가 부과되는 중국산 대비 미국 시장 내 확고한 가격 경쟁력을 지니고 있습니다.</li>
+            <li><b>IRA 기반 공급망 재편 기회:</b> 미국 IRA(인플레이션 감축법)의 배터리 부품 요건 강화에 따라 북미 현지 완성차 업체들의 '탈중국 부품 벤더' 수요가 폭발적으로 증가하고 있습니다. 당사의 <b>NCM 양극재 811 및 알루미늄 케이스</b> 수출 물량 확대를 위한 적극적인 영업 전개가 권장됩니다.</li>
+            <li><b>통관 리스크 관리:</b> 무관세 혜택을 적용받기 위해서는 철저한 <b>원산지 증명(원산지 결정기준 충족 여부)</b> 관리가 필수적입니다. 유니패스 연동 시스템을 통해 실시간 면장 및 C/O(원산지증명서) 발급 현황을 면밀히 모니터링하시기 바랍니다.</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
