@@ -647,6 +647,18 @@ with tab3:
     def set_vessel(v):
         st.session_state.search_vessel_input = v
 
+    
+    # 선박 검색 이력 세션 상태 초기화
+    if 'vessel_history' not in st.session_state:
+        st.session_state.vessel_history = []
+    if 'vessel_input_widget' not in st.session_state:
+        st.session_state.vessel_input_widget = ""
+    if 'synced_dclr' not in st.session_state:
+        st.session_state.synced_dclr = ""
+
+    def set_vessel(v):
+        st.session_state.vessel_input_widget = v
+
     with tab4:
         st.header(t.get('tab4', '🚢 해상 물류 및 수출입 통관 모니터링'))
         
@@ -658,13 +670,13 @@ with tab3:
             hist_cols = st.columns(len(st.session_state.vessel_history) + 1)
             for i, hist in enumerate(st.session_state.vessel_history):
                 # Use primary color if it's currently selected
-                btn_type = "primary" if hist == st.session_state.search_vessel_input else "secondary"
+                btn_type = "primary" if hist == st.session_state.vessel_input_widget else "secondary"
                 hist_cols[i].button(f"🛳️ {hist}", key=f"hist_{hist}", on_click=set_vessel, args=(hist,), type=btn_type, use_container_width=True)
             st.markdown("<br>", unsafe_allow_html=True)
             
         col_s1, col_s2 = st.columns([3, 1])
         with col_s1:
-            search_vessel = st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", value=st.session_state.search_vessel_input, placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
+            search_vessel = st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", key="vessel_input_widget", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
         
         if search_vessel:
             search_vessel = search_vessel.strip()
@@ -678,7 +690,7 @@ with tab3:
         if search_vessel:
             if len(search_vessel) == 9 and search_vessel.isdigit():
                 mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
-            elif len(search_vessel) == 7 and search_vessel.isdigit():
+            elif len(search_vessel) >= 7 and search_vessel.isdigit():
                 mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
                 
         vesselfinder_html = f"""
@@ -714,7 +726,7 @@ with tab3:
         st.markdown("---")
         st.subheader("📋 관세청 유니패스(UNIPASS) 실시간 연동")
         
-        dclr_no = st.text_input("🔍 수출신고번호(면장번호) 14자리 입력", placeholder="예: 4177426003706X")
+        dclr_no = st.text_input("🔍 수출신고번호(면장번호) 14자리 입력", key="dclr_no_widget", placeholder="예: 4177426003706X")
         
         if dclr_no:
             import requests
@@ -723,22 +735,27 @@ with tab3:
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             
-            def get_realtime_eta(query):
+            def get_realtime_eta_and_imo(query):
                 from bs4 import BeautifulSoup
                 headers = {'User-Agent': 'Mozilla/5.0'}
                 try:
                     res = requests.get(f"https://www.vesselfinder.com/vessels?name={query}", headers=headers, timeout=5)
                     soup = BeautifulSoup(res.text, 'html.parser')
                     link = soup.select_one('a.ship-link')
-                    if not link: return None
-                    detail_url = f"https://www.vesselfinder.com{link.get('href')}"
+                    if not link: return None, None
+                    href = link.get('href')
+                    imo = href.split('/')[-1] if href else None
+                    
+                    detail_url = f"https://www.vesselfinder.com{href}"
                     res2 = requests.get(detail_url, headers=headers, timeout=5)
                     soup2 = BeautifulSoup(res2.text, 'html.parser')
                     eta_span = soup2.find(string=re.compile(r'ETA:'))
-                    if eta_span: return eta_span.strip()
+                    eta_str = eta_span.strip() if eta_span else None
+                    
+                    return imo, eta_str
                 except:
                     pass
-                return None
+                return None, None
             
             clean_no = dclr_no.replace("-", "").strip()
             
@@ -764,6 +781,22 @@ with tab3:
                                 'csclPckUt': item.findtext('csclPckUt', ''),
                             }
                             
+                            sanm = data.get('sanm', '')
+                            
+                            # Auto-Sync Map Logic
+                            # If we haven't synced this declaration yet, we do it now.
+                            if st.session_state.synced_dclr != clean_no:
+                                st.session_state.synced_dclr = clean_no
+                                if sanm:
+                                    imo, _ = get_realtime_eta_and_imo(sanm)
+                                    if imo and imo.isdigit():
+                                        st.session_state.vessel_input_widget = imo
+                                        if imo not in st.session_state.vessel_history:
+                                            st.session_state.vessel_history.insert(0, imo)
+                                            if len(st.session_state.vessel_history) > 6:
+                                                st.session_state.vessel_history = st.session_state.vessel_history[:6]
+                                        st.rerun() # Refresh the page to show the map with new IMO
+                                        
                             # Format dates nicely
                             acpt_dt_formatted = data['acptDt']
                             if len(acpt_dt_formatted) == 8: # YYYYMMDD
@@ -781,11 +814,11 @@ with tab3:
                             is_loaded = data['shpmCmplYn'] == 'Y'
                             
                             # Real-time ETA Scrape
-                            query_term = search_vessel if search_vessel else data.get('sanm')
+                            query_term = search_vessel if search_vessel else sanm
                             vf_eta_str = None
                             vf_dt = None
                             if query_term:
-                                vf_eta_str = get_realtime_eta(query_term)
+                                _, vf_eta_str = get_realtime_eta_and_imo(query_term)
                                 if vf_eta_str:
                                     try:
                                         clean_str = vf_eta_str.replace("ETA:", "").strip()
