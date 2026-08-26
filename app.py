@@ -612,16 +612,13 @@ with tab3:
         st.session_state.dclr_history = []
     if 'dclr_input_widget' not in st.session_state:
         st.session_state.dclr_input_widget = ""
+    if 'imo_to_dclr_cache' not in st.session_state:
+        st.session_state.imo_to_dclr_cache = {}
 
     def set_vessel(v):
         st.session_state.vessel_input_widget = v
-        # 우측 선박 선택 시 좌측 유니패스 연동
-        imo_to_dclr = {
-            "9955284": "4177426003929X", # HMM TOPAZ
-            "9863297": "1234567890123M", # HMM ALGECIRAS
-            "9863302": "4177426003706X"  # HMM COPENHAGEN
-        }
-        mapped_dclr = imo_to_dclr.get(v)
+        # 캐시된 이력을 바탕으로 좌측 유니패스 연동
+        mapped_dclr = st.session_state.imo_to_dclr_cache.get(v)
         if mapped_dclr:
             st.session_state.synced_dclr = mapped_dclr
             st.session_state.dclr_input_widget = mapped_dclr
@@ -636,12 +633,8 @@ with tab3:
                 st.session_state.vessel_history.insert(0, v)
                 if len(st.session_state.vessel_history) > 6:
                     st.session_state.vessel_history = st.session_state.vessel_history[:6]
-            imo_to_dclr = {
-                "9955284": "4177426003929X", # HMM TOPAZ
-                "9863297": "1234567890123M",
-                "9863302": "4177426003706X"
-            }
-            mapped_dclr = imo_to_dclr.get(v)
+            # 캐시된 이력을 바탕으로 좌측 유니패스 연동
+            mapped_dclr = st.session_state.imo_to_dclr_cache.get(v)
             if mapped_dclr:
                 st.session_state.synced_dclr = mapped_dclr
                 st.session_state.dclr_input_widget = mapped_dclr
@@ -781,13 +774,6 @@ with tab3:
                                 
                             if data:
                                 sanm = data.get('sanm', '')
-                                
-                                # 미선적 상태라 선박명이 없더라도, 신고서상 배정된 선박을 파싱했다고 가정 (데모 연동)
-                                if not sanm:
-                                    if clean_no.endswith("929X"): sanm = "HMM TOPAZ"
-                                    elif clean_no == "1234567890123M": sanm = "HMM ALGECIRAS"
-                                    else: sanm = "HMM COPENHAGEN"
-                                    data['sanm'] = sanm
                                     
                                 # Auto-Sync Map Logic (only for the first item in the list)
                                 if idx == 0 and not synced_this_run:
@@ -796,6 +782,7 @@ with tab3:
                                         if sanm:
                                             imo = get_realtime_eta_and_imo(sanm).get('imo')
                                             if imo and imo.isdigit():
+                                                st.session_state.imo_to_dclr_cache[imo] = clean_no
                                                 st.session_state.vessel_input_widget = imo
                                                 if imo not in st.session_state.vessel_history:
                                                     st.session_state.vessel_history.insert(0, imo)
