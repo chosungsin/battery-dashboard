@@ -597,53 +597,162 @@ with tab3:
         st.dataframe(df_disc, use_container_width=True, hide_index=True)
 
 
-with tab4:
-    st.header(t.get('tab4', '🚢 해상 물류 모니터링'))
-    st.markdown("글로벌 이차전지 및 분리막 수출입 물동량을 모니터링하기 위한 실시간 선박 위치(ShipFinder) 정보입니다.")
-    st.markdown("🔒 **VesselFinder** 기반 실시간 선박 위치(도착 예상 시간 포함) 및 **Windy** 해상 기상도입니다.")
-    
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        search_vessel = st.text_input("🔍 선박 고유번호 (IMO 또는 MMSI) 검색", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
-    
-    # 1. VesselFinder Iframe (ETA 및 선박 추적)
-    mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
-    if search_vessel:
-        search_vessel = search_vessel.strip()
-        if len(search_vessel) == 9 and search_vessel.isdigit():
-            mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
-        elif len(search_vessel) == 7 and search_vessel.isdigit():
-            mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
-        else:
-            st.warning("유효한 9자리 MMSI 번호 또는 7자리 IMO 번호를 입력해 주세요.")
-            
-    vesselfinder_html = f"""
-    <div style="margin-bottom: 20px;">
-        <h4 style="font-family: sans-serif; margin-bottom: 10px;">🚢 실시간 선박 위치 & ETA (VesselFinder)</h4>
-        <div style="width: 100%; height: 500px;">
-            <script type="text/javascript">
-                var width="100%";
-                var height="500";
-                var names=true;
-                {mmsi_script}
-            </script>
-            <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+
+    # 선박 검색 이력 세션 상태 초기화
+    if 'vessel_history' not in st.session_state:
+        st.session_state.vessel_history = []
+    if 'search_vessel_input' not in st.session_state:
+        st.session_state.search_vessel_input = ""
+
+    def set_vessel(v):
+        st.session_state.search_vessel_input = v
+
+    with tab4:
+        st.header(t.get('tab4', '🚢 해상 물류 및 수출입 통관 모니터링'))
+        st.markdown("글로벌 이차전지 및 분리막 수출입 물동량을 모니터링하기 위한 실시간 선박 위치(VesselFinder) 및 유니패스(UNIPASS) 통관 정보입니다.")
+        
+        # --- 1. 선박 조회 섹션 ---
+        st.subheader("🚢 선박 실시간 위치 및 기상 조회")
+        
+        col_s1, col_s2 = st.columns([3, 1])
+        with col_s1:
+            search_vessel = st.text_input("🔍 선박 고유번호 (IMO/MMSI)", value=st.session_state.search_vessel_input, placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
+        
+        if search_vessel:
+            search_vessel = search_vessel.strip()
+            if search_vessel not in st.session_state.vessel_history:
+                st.session_state.vessel_history.insert(0, search_vessel)
+                if len(st.session_state.vessel_history) > 5:
+                    st.session_state.vessel_history = st.session_state.vessel_history[:5]
+        
+        # 검색 이력 버튼 UI (지도와 겹치지 않도록 일반 Streamlit 버튼 사용)
+        if st.session_state.vessel_history:
+            st.write("🕒 **최근 조회 이력:**")
+            hist_cols = st.columns(len(st.session_state.vessel_history) + 3)
+            for i, hist in enumerate(st.session_state.vessel_history):
+                hist_cols[i].button(hist, key=f"hist_{hist}", on_click=set_vessel, args=(hist,))
+        
+        mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
+        if search_vessel:
+            if len(search_vessel) == 9 and search_vessel.isdigit():
+                mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
+            elif len(search_vessel) == 7 and search_vessel.isdigit():
+                mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
+            else:
+                st.warning("유효한 9자리 MMSI 번호 또는 7자리 IMO 번호를 입력해 주세요.")
+                
+        vesselfinder_html = f"""
+        <div style="margin-bottom: 20px;">
+            <div style="width: 100%; height: 500px;">
+                <script type="text/javascript">
+                    var width="100%";
+                    var height="500";
+                    var names=true;
+                    {mmsi_script}
+                </script>
+                <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+            </div>
         </div>
-    </div>
-    """
-    
-    # 2. Windy Iframe (바다 날씨 및 파도 예측)
-    windy_html = """
-    <div>
-        <h4 style="font-family: sans-serif; margin-bottom: 10px;">🌊 바다 날씨 및 풍랑 예측 (Windy)</h4>
-        <iframe 
-            width="100%" 
-            height="400" 
-            src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=kt&zoom=4&overlay=waves&product=ecmwf&level=surface&lat=35.0&lon=129.0" 
-            frameborder="0">
-        </iframe>
-    </div>
-    """
-    
-    import streamlit.components.v1 as components
-    components.html(vesselfinder_html + windy_html, height=1000, scrolling=True)
+        """
+        
+        windy_html = """
+        <div>
+            <h4 style="font-family: sans-serif; margin-bottom: 10px;">🌊 바다 날씨 및 풍랑 예측 (Windy)</h4>
+            <iframe 
+                width="100%" 
+                height="400" 
+                src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=kt&zoom=4&overlay=waves&product=ecmwf&level=surface&lat=35.0&lon=129.0" 
+                frameborder="0">
+            </iframe>
+        </div>
+        """
+        
+        import streamlit.components.v1 as components
+        components.html(vesselfinder_html + windy_html, height=950, scrolling=True)
+
+        # --- 2. 유니패스 수출입 통관 섹션 ---
+        st.markdown("---")
+        st.subheader("📋 유니패스(UNIPASS) 수출 면장 조회 및 인쇄")
+        
+        dclr_no = st.text_input("🔍 수출신고번호 14자리 입력", placeholder="예: 12345678901234")
+        
+        if dclr_no:
+            import requests
+            import xml.etree.ElementTree as ET
+            
+            clean_no = dclr_no.replace("-", "").strip()
+            # Disable unverified HTTPS warning for Unipass
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            
+            with st.spinner("유니패스 데이터를 조회 중입니다..."):
+                unipass_key = "o260d286z008x204x010n090j2"
+                url = f"https://unipass.customs.go.kr:38010/ext/rest/expDclrNoPrExpFfmnBrkdQry/retrieveExpDclrNoPrExpFfmnBrkd?crkyCn={unipass_key}&expDclrNo={clean_no}"
+                
+                try:
+                    res = requests.get(url, verify=False, timeout=10)
+                    root = ET.fromstring(res.content)
+                    t_cnt = root.findtext('tCnt')
+                    
+                    if t_cnt and t_cnt != "0":
+                        item = root.find('expDclrNoPrExpFfmnBrkdQryRsltVo')
+                        if item is not None:
+                            data = {
+                                'expDclrNo': item.findtext('expDclrNo', ''),
+                                'acptDt': item.findtext('acptDt', ''),
+                                'exppnConm': item.findtext('exppnConm', ''),
+                                'sanm': item.findtext('sanm', ''),
+                                'loadDtyTmlm': item.findtext('loadDtyTmlm', ''),
+                                'shpmCmplYn': item.findtext('shpmCmplYn', ''),
+                                'csclPckUt': item.findtext('csclPckUt', ''),
+                            }
+                            
+                            st.success("✅ 유니패스 수출신고필증 정보가 조회되었습니다.")
+                            
+                            # 타임라인 UI
+                            step = 1
+                            if data['acptDt']: step = 2
+                            if data['shpmCmplYn'] == 'Y': step = 3
+                            
+                            col_t1, col_t2, col_t3 = st.columns(3)
+                            col_t1.info("📝 1. 신고접수 완료")
+                            col_t2.success(f"✅ 2. 수리완료 ({data['acptDt']})" if step >= 2 else "⏳ 2. 수리 대기중")
+                            if step >= 3:
+                                col_t3.success("🚢 3. 선적완료")
+                            else:
+                                col_t3.warning(f"⏳ 3. 선적 대기중 (적재기한: {data['loadDtyTmlm']})")
+                            
+                            # 인쇄 팝업 버튼 (새 창에서 인쇄)
+                            print_html = f"""
+                            <button onclick="printDoc()" style="padding:15px; width:100%; background:#2ecc71; color:white; font-size:16px; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">📄 수출신고필증(면장) 원본 보기 및 인쇄 / PDF 저장</button>
+                            <script>
+                            function printDoc() {{
+                                var w = window.open('', '_blank', 'height=800,width=800');
+                                w.document.write('<html><head><title>수출신고필증</title>');
+                                w.document.write('<style>');
+                                w.document.write('body {{ font-family: "Malgun Gothic", sans-serif; padding: 20px; }}');
+                                w.document.write('table {{ width:100%; border-collapse:collapse; margin-top:20px; }}');
+                                w.document.write('th, td {{ border:2px solid #333; padding:12px; font-size:14px; }}');
+                                w.document.write('th {{ background:#f5f6fa; text-align:left; width:25%; }}');
+                                w.document.write('h2 {{ text-align:center; font-size:28px; text-decoration:underline; letter-spacing: 5px; }}');
+                                w.document.write('</style></head><body>');
+                                w.document.write('<h2>수출신고필증</h2>');
+                                w.document.write('<table>');
+                                w.document.write('<tr><th>신고번호</th><td>{data['expDclrNo']}</td><th>수리일자</th><td>{data['acptDt']}</td></tr>');
+                                w.document.write('<tr><th>수출자 (화주)</th><td colspan="3"><b>{data['exppnConm']}</b></td></tr>');
+                                w.document.write('<tr><th>적재의무기한</th><td>{data['loadDtyTmlm']}</td><th>선적여부</th><td>{data['shpmCmplYn']}</td></tr>');
+                                w.document.write('<tr><th>선/기명</th><td>{data.get('sanm', '미정')}</td><th>포장수량</th><td>{data['csclPckUt']}</td></tr>');
+                                w.document.write('</table>');
+                                w.document.write('<p style="text-align:center; margin-top:40px; color:#555;">본 증명서는 관세청 통관시스템(UNIPASS) 전자문서와 동일함을 증명합니다.</p>');
+                                w.document.write('</body></html>');
+                                w.document.close();
+                                w.focus();
+                                setTimeout(function() {{ w.print(); }}, 500);
+                            }}
+                            </script>
+                            """
+                            components.html(print_html, height=70)
+                    else:
+                        st.error("❌ 해당 번호로 조회된 통관 데이터가 없습니다. 번호를 다시 확인해 주세요.")
+                except Exception as e:
+                    st.error(f"⚠️ 유니패스 API 통신 오류: {e}")
