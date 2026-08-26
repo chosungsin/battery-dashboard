@@ -684,21 +684,9 @@ with tab3:
                 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
                 
                 def get_realtime_eta_and_imo(query):
-                    # Hardcoded robust mock for seamless demo experience (VesselFinder details are blocked by 403)
-                    mock_db = {
-                        "HMM ALGECIRAS": {"imo": "9863297", "mmsi": "352002000", "callsign": "3E2345", "flag": "Panama (PA)", "eta": "2026-08-30 14:00"},
-                        "HMM COPENHAGEN": {"imo": "9863302", "mmsi": "352002001", "callsign": "3E2346", "flag": "Panama (PA)", "eta": "2026-09-02 10:00"},
-                        "MSC GULSUN": {"imo": "9839430", "mmsi": "353000000", "callsign": "3E4444", "flag": "Panama (PA)", "eta": "2026-08-28 09:00"}
-                    }
-                    query_upper = query.upper()
-                    for k, v in mock_db.items():
-                        if k in query_upper or query_upper in k:
-                            return v
-                    
-                    # Fallback to scraping just for IMO
                     from bs4 import BeautifulSoup
                     import requests
-                    headers = {'User-Agent': 'Mozilla/5.0'}
+                    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
                     try:
                         res = requests.get(f"https://www.vesselfinder.com/vessels?name={query}", headers=headers, timeout=5)
                         soup = BeautifulSoup(res.text, 'html.parser')
@@ -706,7 +694,10 @@ with tab3:
                         if link:
                             href = link.get('href')
                             imo = href.split('/')[-1] if href else None
-                            return {"imo": imo, "mmsi": "조회불가(API제한)", "callsign": "조회불가", "flag": "조회불가", "eta": None}
+                            # Extract IMO from URL, e.g., /vessels/details/9863297
+                            if imo and '-' in imo:
+                                imo = imo.split('-')[-1]
+                            return {"imo": imo, "mmsi": "조회불가", "callsign": "조회불가", "flag": "조회불가", "eta": None}
                     except:
                         pass
                     return {"imo": None, "mmsi": "미상", "callsign": "미상", "flag": "미상", "eta": None}
@@ -758,19 +749,7 @@ with tab3:
                                     }
                                     is_import = False
                             else:
-                                # 수출이행내역(API002)에서 조회가 안 될 경우 수입신고번호로 간주 (데모 연동)
-                                if idx == 0:
-                                    st.info("💡 유니패스 수출API(API002)에서 조회되지 않아, **수입신고건**으로 간주하여 화면과 지도를 연동합니다. (실제 수입 API 연동 전 데모)")
-                                data = {
-                                    'expDclrNo': clean_no,
-                                    'acptDt': '20260810',
-                                    'exppnConm': '수입화주 (주)테스트배터리',
-                                    'sanm': 'HMM ALGECIRAS', # 실제 배 이름 (VesselFinder 연동 테스트용)
-                                    'loadDtyTmlm': '20260830',
-                                    'shpmCmplYn': 'Y',
-                                    'csclPckUt': '120 PLT',
-                                }
-                                is_import = True
+                                st.warning(f"⚠️ 유니패스에서 면장번호 '{clean_no}'를 찾을 수 없습니다. (조회 결과 없음)")
                                 
                             if data:
                                 sanm = data.get('sanm', '')
@@ -983,7 +962,7 @@ with tab3:
                                                 <div class="step">
                                                     <div class="step-icon {'' if is_loaded else 'pending'}"><i class="fa-solid {'fa-check' if is_loaded else 'fa-clock'}"></i></div>
                                                     <div class="step-title" style="color:{'inherit' if is_loaded else '#64748b'}">{pol_desc}</div>
-                                                    <div class="step-date {'' if is_loaded else 'pending'}">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (출항 예정)"}</div>
+                                                    <div class="step-date {'' if is_loaded else 'pending'}">{f"기한: {load_tmlm} (선적완료)" if is_loaded else f"기한: {load_tmlm} (미선적)"}</div>
                                                 </div>
                                                 <div class="step">
                                                     <div class="step-icon {'delayed' if is_delayed else 'pending'}"><i class="fa-solid {'fa-triangle-exclamation' if is_delayed else 'fa-ship'}"></i></div>
@@ -1043,7 +1022,7 @@ with tab3:
                                                 <tr>
                                                     <td style="color:#94a3b8;">3</td>
                                                     <td style="font-weight:600;">{'양하 (Cargo Discharging)' if is_import else '선적 (Cargo Loading)'}</td>
-                                                    <td style="font-family:monospace;">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (예정)"}</td>
+                                                    <td style="font-family:monospace;">{f"기한: {load_tmlm} (선적완료)" if is_loaded else f"기한: {load_tmlm} (미선적)"}</td>
                                                     <td style="color:#64748b;">{pol_desc} / {data.get('sanm', '미상')}</td>
                                                     <td>
                                                         { '<div class="status-complete"><i class="fa-solid fa-check"></i>완료</div>' if is_loaded else '<div class="status-pending"><i class="fa-solid fa-clock"></i>미완료(예상)</div>' }
