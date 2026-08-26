@@ -1196,12 +1196,12 @@ with tab5:
     # 데이터 준비
     years = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
     korea_rates = [0, 0, 0, 0, 0, 0, 0, 0, 0]
-    china_rates = [3.4, 10.9, 10.9, 10.9, 10.9, 10.9, 28.4, 28.4, 28.4]
+    china_rates = [0, 7.5, 7.5, 7.5, 7.5, 7.5, 25.0, 25.0, 25.0]
     
     df_tariff = pd.DataFrame({
         'Year': years,
         'Korea (KORUS FTA)': korea_rates,
-        'China (MFN + Sec. 301)': china_rates
+        'China (Sec. 301 Tariff)': china_rates
     })
     
     fig = go.Figure()
@@ -1215,19 +1215,19 @@ with tab5:
         marker=dict(size=10),
         text=[f"{r}%" for r in korea_rates],
         textposition="bottom center",
-        textfont=dict(color='#10b981', size=12, weight='bold')
+        textfont=dict(size=13, weight='bold')
     ))
     
     # 중국산 관세율 라인
     fig.add_trace(go.Scatter(
-        x=df_tariff['Year'], y=df_tariff['China (MFN + Sec. 301)'],
+        x=df_tariff['Year'], y=df_tariff['China (Sec. 301 Tariff)'],
         mode='lines+markers+text',
-        name='중국산 (제재관세 부과)',
+        name='중국산 (301조 제재관세 적용)',
         line=dict(color='#ef4444', width=4, dash='dot'),
         marker=dict(size=10),
         text=[f"{r}%" for r in china_rates],
         textposition="top center",
-        textfont=dict(color='#ef4444', size=12, weight='bold')
+        textfont=dict(size=13, weight='bold')
     ))
     
     # 주요 이벤트 주석 추가 (IRA, 301조 인상)
@@ -1266,8 +1266,8 @@ with tab5:
     )
     
     # Grid lines
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#f1f5f9')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#f1f5f9')
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='rgba(128,128,128,0.2)')
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='rgba(128,128,128,0.2)')
     
     st.plotly_chart(fig, use_container_width=True)
     
