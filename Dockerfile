@@ -7,8 +7,6 @@ WORKDIR /app
 # 시스템 패키지 업데이트 및 필수 패키지 설치
 RUN apt-get update && apt-get install -y \
     build-essential \
-    curl \
-    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
 # 파이썬 라이브러리 목록 복사 및 설치
