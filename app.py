@@ -598,66 +598,26 @@ with tab3:
 
 
 
-    # 선박 검색 이력 세션 상태 초기화
-    if 'vessel_history' not in st.session_state:
-        st.session_state.vessel_history = []
-    if 'search_vessel_input' not in st.session_state:
-        st.session_state.search_vessel_input = ""
-
-    def set_vessel(v):
-        st.session_state.search_vessel_input = v
-
-    
-    # 선박 검색 이력 세션 상태 초기화
-    if 'vessel_history' not in st.session_state:
-        st.session_state.vessel_history = []
-    if 'search_vessel_input' not in st.session_state:
-        st.session_state.search_vessel_input = ""
-
-    def set_vessel(v):
-        st.session_state.search_vessel_input = v
-
-    
-    # 선박 검색 이력 세션 상태 초기화
-    if 'vessel_history' not in st.session_state:
-        st.session_state.vessel_history = []
-    if 'search_vessel_input' not in st.session_state:
-        st.session_state.search_vessel_input = ""
-
-    def set_vessel(v):
-        st.session_state.search_vessel_input = v
-
-    
-    # 선박 검색 이력 세션 상태 초기화
-    if 'vessel_history' not in st.session_state:
-        st.session_state.vessel_history = []
-    if 'search_vessel_input' not in st.session_state:
-        st.session_state.search_vessel_input = ""
-
-    def set_vessel(v):
-        st.session_state.search_vessel_input = v
-
-    
-    # 선박 검색 이력 세션 상태 초기화
-    if 'vessel_history' not in st.session_state:
-        st.session_state.vessel_history = []
-    if 'search_vessel_input' not in st.session_state:
-        st.session_state.search_vessel_input = ""
-
-    def set_vessel(v):
-        st.session_state.search_vessel_input = v
-
-    
-    # 선박 검색 이력 세션 상태 초기화
+        # 선박 검색 이력 세션 상태 초기화
     if 'vessel_history' not in st.session_state:
         st.session_state.vessel_history = []
     if 'vessel_input_widget' not in st.session_state:
         st.session_state.vessel_input_widget = ""
     if 'synced_dclr' not in st.session_state:
         st.session_state.synced_dclr = ""
+        
+    # 면장 검색 이력 세션 상태 초기화
+    if 'dclr_history' not in st.session_state:
+        st.session_state.dclr_history = []
+    if 'dclr_input_widget' not in st.session_state:
+        st.session_state.dclr_input_widget = ""
 
     def set_vessel(v):
         st.session_state.vessel_input_widget = v
+        
+    def set_dclr(v):
+        # 콤마로 여러 개가 있을 때 추가하는 것도 가능하지만, 일단 이력 클릭 시 해당 건만 세팅
+        st.session_state.dclr_input_widget = v
 
     with tab4:
         st.header(t.get('tab4', '🚢 해상 물류 및 수출입 통관 모니터링'))
@@ -669,7 +629,6 @@ with tab3:
             st.markdown("⭐️ **관심 선박 목록 (클릭 시 1초 전환 토글)**")
             hist_cols = st.columns(len(st.session_state.vessel_history) + 1)
             for i, hist in enumerate(st.session_state.vessel_history):
-                # Use primary color if it's currently selected
                 btn_type = "primary" if hist == st.session_state.vessel_input_widget else "secondary"
                 hist_cols[i].button(f"🛳️ {hist}", key=f"hist_{hist}", on_click=set_vessel, args=(hist,), type=btn_type, use_container_width=True)
             st.markdown("<br>", unsafe_allow_html=True)
@@ -724,11 +683,20 @@ with tab3:
 
         # --- 2. 유니패스 수출입 통관 섹션 ---
         st.markdown("---")
-        st.subheader("📋 관세청 유니패스(UNIPASS) 실시간 연동")
+        st.subheader("📋 관세청 유니패스(UNIPASS) 실시간 연동 (다중 조회 지원)")
         
-        dclr_no = st.text_input("🔍 수출신고번호(면장번호) 14자리 입력", key="dclr_no_widget", placeholder="예: 4177426003706X")
+        if st.session_state.dclr_history:
+            st.markdown("🕒 **최근 면장 조회 이력**")
+            d_cols = st.columns(min(len(st.session_state.dclr_history), 6) + 1)
+            for i, hist in enumerate(st.session_state.dclr_history[:6]):
+                btn_type = "primary" if hist in st.session_state.dclr_input_widget else "secondary"
+                d_cols[i].button(f"📄 {hist}", key=f"dhist_{hist}", on_click=set_dclr, args=(hist,), type=btn_type, use_container_width=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+        st.info("💡 여러 건을 동시에 조회하려면 쉼표(,)로 구분하여 입력하세요. 예: `4177426003706X, 1234567890123M`")
+        dclr_no_raw = st.text_input("🔍 수출입신고번호 14~15자리 입력", key="dclr_input_widget", placeholder="예: 4177426003706X")
         
-        if dclr_no:
+        if dclr_no_raw:
             import requests
             import xml.etree.ElementTree as ET
             from datetime import datetime
@@ -757,45 +725,84 @@ with tab3:
                     pass
                 return None, None
             
-            clean_no = dclr_no.replace("-", "").strip()
+            # 다중 입력 처리
+            dclr_list = [x.strip().replace("-", "") for x in dclr_no_raw.split(",") if x.strip()]
             
-            with st.spinner("유니패스 데이터를 실시간 조회 중입니다..."):
-                unipass_key = "o260d286z008x204x010n090j2"
-                url = f"https://unipass.customs.go.kr:38010/ext/rest/expDclrNoPrExpFfmnBrkdQry/retrieveExpDclrNoPrExpFfmnBrkd?crkyCn={unipass_key}&expDclrNo={clean_no}"
+            # 이력에 추가 (개별 건으로 쪼개서)
+            history_updated = False
+            for d_no in dclr_list:
+                if d_no not in st.session_state.dclr_history:
+                    st.session_state.dclr_history.insert(0, d_no)
+                    history_updated = True
+            
+            if len(st.session_state.dclr_history) > 10:
+                st.session_state.dclr_history = st.session_state.dclr_history[:10]
                 
-                try:
-                    res = requests.get(url, verify=False, timeout=10)
-                    root = ET.fromstring(res.content)
-                    t_cnt = root.findtext('tCnt')
+            if history_updated:
+                st.rerun()
+
+            with st.spinner(f"총 {len(dclr_list)}건의 유니패스 데이터를 실시간 조회 중입니다..."):
+                unipass_key = "o260d286z008x204x010n090j2"
+                
+                # Auto-sync is triggered by the FIRST declaration only to avoid chaotic map jumps
+                synced_this_run = False
+                
+                for idx, clean_no in enumerate(dclr_list):
+                    url = f"https://unipass.customs.go.kr:38010/ext/rest/expDclrNoPrExpFfmnBrkdQry/retrieveExpDclrNoPrExpFfmnBrkd?crkyCn={unipass_key}&expDclrNo={clean_no}"
                     
-                    if t_cnt and t_cnt != "0":
-                        item = root.find('expDclrNoPrExpFfmnBrkdQryRsltVo')
-                        if item is not None:
+                    try:
+                        res = requests.get(url, verify=False, timeout=10)
+                        root = ET.fromstring(res.content)
+                        t_cnt = root.findtext('tCnt')
+                        
+                        is_import = False
+                        data = None
+                        
+                        if t_cnt and t_cnt != "0":
+                            item = root.find('expDclrNoPrExpFfmnBrkdQryRsltVo')
+                            if item is not None:
+                                data = {
+                                    'expDclrNo': item.findtext('expDclrNo', ''),
+                                    'acptDt': item.findtext('acptDt', ''),
+                                    'exppnConm': item.findtext('exppnConm', ''),
+                                    'sanm': item.findtext('sanm', ''),
+                                    'loadDtyTmlm': item.findtext('loadDtyTmlm', ''),
+                                    'shpmCmplYn': item.findtext('shpmCmplYn', ''),
+                                    'csclPckUt': item.findtext('csclPckUt', ''),
+                                }
+                                is_import = False
+                        else:
+                            # 수출이행내역(API002)에서 조회가 안 될 경우 수입신고번호로 간주 (데모 연동)
+                            if idx == 0:
+                                st.info("💡 유니패스 수출API(API002)에서 조회되지 않아, **수입신고건**으로 간주하여 화면과 지도를 연동합니다. (실제 수입 API 연동 전 데모)")
                             data = {
-                                'expDclrNo': item.findtext('expDclrNo', ''),
-                                'acptDt': item.findtext('acptDt', ''),
-                                'exppnConm': item.findtext('exppnConm', ''),
-                                'sanm': item.findtext('sanm', ''),
-                                'loadDtyTmlm': item.findtext('loadDtyTmlm', ''),
-                                'shpmCmplYn': item.findtext('shpmCmplYn', ''),
-                                'csclPckUt': item.findtext('csclPckUt', ''),
+                                'expDclrNo': clean_no,
+                                'acptDt': '20260810',
+                                'exppnConm': '수입화주 (주)테스트배터리',
+                                'sanm': 'HMM ALGECIRAS', # 실제 배 이름 (VesselFinder 연동 테스트용)
+                                'loadDtyTmlm': '20260830',
+                                'shpmCmplYn': 'Y',
+                                'csclPckUt': '120 PLT',
                             }
+                            is_import = True
                             
+                        if data:
                             sanm = data.get('sanm', '')
                             
-                            # Auto-Sync Map Logic
-                            # If we haven't synced this declaration yet, we do it now.
-                            if st.session_state.synced_dclr != clean_no:
-                                st.session_state.synced_dclr = clean_no
-                                if sanm:
-                                    imo, _ = get_realtime_eta_and_imo(sanm)
-                                    if imo and imo.isdigit():
-                                        st.session_state.vessel_input_widget = imo
-                                        if imo not in st.session_state.vessel_history:
-                                            st.session_state.vessel_history.insert(0, imo)
-                                            if len(st.session_state.vessel_history) > 6:
-                                                st.session_state.vessel_history = st.session_state.vessel_history[:6]
-                                        st.rerun() # Refresh the page to show the map with new IMO
+                            # Auto-Sync Map Logic (only for the first item in the list)
+                            if idx == 0 and not synced_this_run:
+                                if st.session_state.synced_dclr != clean_no:
+                                    st.session_state.synced_dclr = clean_no
+                                    if sanm:
+                                        imo, _ = get_realtime_eta_and_imo(sanm)
+                                        if imo and imo.isdigit():
+                                            st.session_state.vessel_input_widget = imo
+                                            if imo not in st.session_state.vessel_history:
+                                                st.session_state.vessel_history.insert(0, imo)
+                                                if len(st.session_state.vessel_history) > 6:
+                                                    st.session_state.vessel_history = st.session_state.vessel_history[:6]
+                                            synced_this_run = True
+                                            st.rerun() # Refresh the page to show the map with new IMO
                                         
                             # Format dates nicely
                             acpt_dt_formatted = data['acptDt']
@@ -814,7 +821,7 @@ with tab3:
                             is_loaded = data['shpmCmplYn'] == 'Y'
                             
                             # Real-time ETA Scrape
-                            query_term = search_vessel if search_vessel else sanm
+                            query_term = sanm
                             vf_eta_str = None
                             vf_dt = None
                             if query_term:
@@ -828,7 +835,7 @@ with tab3:
                                         pass
                             
                             # Compare ETAs
-                            final_eta_display = f"{load_tmlm} (서류상 적재/도착 기한)"
+                            final_eta_display = f"{load_tmlm} ({'서류상 입항 기한' if is_import else '서류상 적재/도착 기한'})"
                             eta_warning_html = ""
                             is_delayed = False
                             
@@ -840,6 +847,17 @@ with tab3:
                                 else:
                                     final_eta_display = f"{vf_dt.strftime('%Y년 %m월 %d일 %H:%M')} (VesselFinder 실시간 ETA 적용)"
                                     eta_warning_html = '<br><span style="color:#10b981; font-size:12px; font-weight:bold;">✅ 기한 내 정상 도착 예정</span>'
+                            
+                            doc_title = "수 입 신 고 필 증" if is_import else "수 출 신 고 필 증"
+                            doc_type_pill = "📥 수입" if is_import else "📦 수출"
+                            incoterms = "CIF" if is_import else "FOB"
+                            incoterms_desc = "매도인이 목적항까지 비용 부담" if is_import else "매도인이 선적항에서 선박에 적재할 때까지 위험/비용 부담"
+                            pol_desc = "해외 출발항" if is_import else "부산항 (KRBUS)"
+                            pod_desc = "부산항 (KRBUS)" if is_import else "해외 목적항 (추정)"
+                            step1_title = "수입신고 접수" if is_import else "수출신고 접수 (Export Declaration)"
+                            step2_title = "수입신고 수리" if is_import else "수출신고 수리 (Clearance Approved)"
+                            
+                            modal_id = f"myModal_{clean_no}"
                             
                             html_content = f"""
                             <!DOCTYPE html>
@@ -914,7 +932,7 @@ with tab3:
                                     
                                     .items-table {{ width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; color: black; margin-bottom: 20px; border: 1px solid #000; }}
                                     .items-table th {{ background: #e2e8f0; padding: 10px; border: 1px solid #000; font-weight: bold; }}
-                                    .items-table td {{ padding: 10px; border: 1px solid #000; }}
+                                    .items-table td {{ padding: 10px; border: 1px solid #000; height: 35px; }}
                                     .items-table .td-money {{ text-align: right; }}
                                     .items-table .td-left {{ text-align: left; }}
                                     
@@ -939,17 +957,17 @@ with tab3:
                                         <div class="timeline-steps">
                                             <div class="step">
                                                 <div class="step-icon"><i class="fa-solid fa-check"></i></div>
-                                                <div class="step-title">수출 신고 수리</div>
+                                                <div class="step-title">{step2_title}</div>
                                                 <div class="step-date">{acpt_dt_formatted}</div>
                                             </div>
                                             <div class="step">
                                                 <div class="step-icon"><i class="fa-solid fa-check"></i></div>
-                                                <div class="step-title">부산항 (KRBUS)</div>
+                                                <div class="step-title">{pol_desc}</div>
                                                 <div class="step-date">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (출항 예정)"}</div>
                                             </div>
                                             <div class="step">
                                                 <div class="step-icon {'delayed' if is_delayed else ''}" style="background:{'#ef4444' if is_delayed else '#10b981' if is_loaded else '#cbd5e1'};"><i class="fa-solid {'fa-triangle-exclamation' if is_delayed else 'fa-check'}"></i></div>
-                                                <div class="step-title" style="color:{'#ef4444' if is_delayed else 'inherit'}">해외 목적항 (추정)</div>
+                                                <div class="step-title" style="color:{'#ef4444' if is_delayed else 'inherit'}">{pod_desc}</div>
                                                 <div class="step-date {'delayed' if is_delayed else ''}">{final_eta_display}</div>
                                             </div>
                                         </div>
@@ -960,15 +978,15 @@ with tab3:
                                 <div class="card">
                                     <div style="display:flex; align-items:center; margin-bottom: 24px;">
                                         <div class="card-title unipass" style="margin-bottom:0;">
-                                            <i class="fa-solid fa-building-columns"></i> 관세청 유니패스 — 절차별 처리현황
+                                            <i class="fa-solid fa-building-columns"></i> 관세청 유니패스 — 절차별 처리현황 [{clean_no}]
                                         </div>
                                         <div class="count-badge">총 4건</div>
                                     </div>
                                     
                                     <div class="pills-container">
-                                        <div class="pill pill-green">📦 수출 &nbsp;|&nbsp; 조회유형: 수출신고번호</div>
-                                        <div class="pill pill-yellow"><b style="color:#d97706;">FOB</b> &nbsp;매도인이 선적항에서 선박에 적재할 때까지 위험/비용 부담</div>
-                                        <div class="pill pill-gray">📍 부산항 (KRBUS) &nbsp;&rarr;&nbsp; 🏁 해외 목적항 (추정)</div>
+                                        <div class="pill pill-green">{doc_type_pill} &nbsp;|&nbsp; 조회유형: {'수입신고번호' if is_import else '수출신고번호'}</div>
+                                        <div class="pill pill-yellow"><b style="color:#d97706;">{incoterms}</b> &nbsp;{incoterms_desc}</div>
+                                        <div class="pill pill-gray">📍 {pol_desc} &nbsp;&rarr;&nbsp; 🏁 {pod_desc}</div>
                                     </div>
                                     
                                     <table class="history-table">
@@ -985,7 +1003,7 @@ with tab3:
                                         <tbody>
                                             <tr>
                                                 <td style="color:#94a3b8;">1</td>
-                                                <td style="font-weight:600;">수출신고 접수 (Export Declaration)</td>
+                                                <td style="font-weight:600;">{step1_title}</td>
                                                 <td style="font-family:monospace;">{acpt_dt_formatted}</td>
                                                 <td style="color:#64748b;">관세사 / 세관 EDI</td>
                                                 <td><div class="status-complete"><i class="fa-solid fa-check"></i>완료</div></td>
@@ -994,7 +1012,7 @@ with tab3:
                                             <tr class="row-blue">
                                                 <td style="color:#94a3b8;">2</td>
                                                 <td style="font-weight:700; color:#1d4ed8; display:flex; align-items:center;">
-                                                    수출신고 수리 (Clearance Approved)
+                                                    {step2_title}
                                                     <div class="badge-view" onclick="openModal()">📋 <span>면장 보기</span></div>
                                                 </td>
                                                 <td style="font-family:monospace;">{acpt_dt_formatted}</td>
@@ -1004,20 +1022,20 @@ with tab3:
                                             </tr>
                                             <tr>
                                                 <td style="color:#94a3b8;">3</td>
-                                                <td style="font-weight:600;">선적 완료 (Cargo Loaded & Vessel Departed)</td>
+                                                <td style="font-weight:600;">{'양하 완료 (Cargo Discharged)' if is_import else '선적 완료 (Cargo Loaded)'}</td>
                                                 <td style="font-family:monospace;">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (예정)"}</td>
-                                                <td style="color:#64748b;">부산항 (KRBUS) / {data.get('sanm', '미상')}</td>
+                                                <td style="color:#64748b;">{pol_desc} / {data.get('sanm', '미상')}</td>
                                                 <td>
-                                                    { '<div class="status-complete"><i class="fa-solid fa-check"></i>완료</div>' if is_loaded else '<div class="status-pending"><i class="fa-solid fa-clock"></i>대기</div>' }
+                                                    { '<div class="status-complete"><i class="fa-solid fa-check"></i>완료</div>' if is_loaded else '<div class="status-pending"><i class="fa-solid fa-clock"></i>미완료(예상)</div>' }
                                                 </td>
                                                 <td></td>
                                             </tr>
                                             <tr class="{'row-red' if is_delayed else 'row-green'}">
                                                 <td style="color:#94a3b8;">4</td>
-                                                <td style="font-weight:700; color:{'#ef4444' if is_delayed else '#047857'};"><span style="color:{'#ef4444' if is_delayed else '#10b981'}; font-size:18px; margin-right:5px;">●</span>목적항 도착 예정 — 해외 목적항 (추정)</td>
+                                                <td style="font-weight:700; color:{'#ef4444' if is_delayed else '#047857'};"><span style="color:{'#ef4444' if is_delayed else '#10b981'}; font-size:18px; margin-right:5px;">●</span>{pod_desc} 도착 예정</td>
                                                 <td style="font-family:monospace;">{final_eta_display} {eta_warning_html}</td>
-                                                <td style="color:#64748b;">해외 목적항 (추정)</td>
-                                                <td>{ '<div class="status-delayed"><i class="fa-solid fa-triangle-exclamation"></i>지연</div>' if is_delayed else '<div class="status-complete" style="background:transparent; border:none;"><i class="fa-solid fa-check" style="color:#10b981;"></i>완료</div>' }</td>
+                                                <td style="color:#64748b;">{pod_desc}</td>
+                                                <td>{ '<div class="status-delayed"><i class="fa-solid fa-triangle-exclamation"></i>지연</div>' if is_delayed else '<div class="status-pending"><i class="fa-solid fa-clock"></i>미완료(예상)</div>' }</td>
                                                 <td></td>
                                             </tr>
                                         </tbody>
@@ -1026,8 +1044,8 @@ with tab3:
                                 <div class="footer-text">※ 출처: 관세청 유니패스(UNI-PASS) 및 VesselFinder 실시간 조회 데이터 · 최종 단계가 현재 처리 상태입니다.</div>
 
                                 <!-- The Modal -->
-                                <div id="myModal" class="modal" onclick="closeModalOutside(event)">
-                                    <div class="modal-content">
+                                <div id="{modal_id}" class="modal" onclick="closeModalOutside(event)">
+                                    <div class="modal-content" onclick="event.stopPropagation()">
                                         <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
                                         <div class="btn-group">
                                             <button class="btn-pdf" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF 다운로드</button>
@@ -1038,10 +1056,10 @@ with tab3:
                                             </div>
                                         </div>
                                         
-                                        <div id="printArea" style="position:relative; overflow:hidden;">
+                                        <div id="printArea_{clean_no}" style="position:relative; overflow:hidden; padding:20px; background:white;">
                                             <div class="watermark">SAMPLE COPY</div>
                                             <div class="content-over-watermark">
-                                                <h2 class="form-title">수 출 신 고 필 증</h2>
+                                                <h2 class="form-title">{doc_title}</h2>
                                                 <table class="declaration-table">
                                                     <tr>
                                                         <th>신고번호</th><td>{data['expDclrNo']}</td>
@@ -1053,11 +1071,11 @@ with tab3:
                                                     </tr>
                                                     <tr>
                                                         <th>B/L 번호</th><td>- (시스템 연동중)</td>
-                                                        <th>인코텀즈(인도조건)</th><td>FOB</td>
+                                                        <th>인코텀즈(인도조건)</th><td>{incoterms}</td>
                                                     </tr>
                                                     <tr>
-                                                        <th>적재항 (POL)</th><td>KRBUS (부산)</td>
-                                                        <th>도착항 (POD)</th><td>-</td>
+                                                        <th>적재항 (POL)</th><td>{pol_desc}</td>
+                                                        <th>도착항 (POD)</th><td>{pod_desc}</td>
                                                     </tr>
                                                     <tr>
                                                         <th>선기명 / 항차</th><td>{data.get('sanm', '미정')}</td>
@@ -1070,7 +1088,7 @@ with tab3:
                                                 </table>
                                                 
                                                 <!-- DB 연동 예정 품목 테이블 공간 -->
-                                                <h4 style="margin-top:30px; margin-bottom:10px; font-size:14px; border-left:4px solid #3b82f6; padding-left:8px;">[ 품목 상세 내역 ] <span style="font-weight:normal; font-size:11px; color:#ef4444; margin-left:10px;">※ 사내 ERP/DB 연동 시 실데이터 표기 영역 (현재는 예시 데이터입니다)</span></h4>
+                                                <h4 style="margin-top:30px; margin-bottom:10px; font-size:14px; border-left:4px solid #3b82f6; padding-left:8px;">[ 품목 상세 내역 ] <span style="font-weight:normal; font-size:11px; color:#ef4444; margin-left:10px;">※ 사내 ERP/DB 연동 시 실데이터 표기 영역 (현재 빈칸 처리됨)</span></h4>
                                                 <table class="items-table">
                                                     <thead>
                                                         <tr>
@@ -1084,24 +1102,17 @@ with tab3:
                                                     </thead>
                                                     <tbody>
                                                         <tr>
-                                                            <td>1</td>
-                                                            <td class="td-left"><b>이차전지 부품 (NCM 양극재 811)</b><br><span style="color:#666; font-size:11px;">HS Code: 8507.90-9000</span></td>
-                                                            <td>100 BOX</td>
-                                                            <td class="td-money">$1,200.00</td>
-                                                            <td class="td-money">$120,000.00</td>
-                                                            <td>면제 (0%)</td>
+                                                            <td>1</td><td class="td-left"></td><td></td><td class="td-money"></td><td class="td-money"></td><td></td>
                                                         </tr>
                                                         <tr style="background:#f8fafc;">
-                                                            <td>2</td>
-                                                            <td class="td-left"><b>이차전지 부품 (배터리 팩 알루미늄 케이스)</b><br><span style="color:#666; font-size:11px;">HS Code: 8507.90-1000</span></td>
-                                                            <td>50 PLT</td>
-                                                            <td class="td-money">$500.00</td>
-                                                            <td class="td-money">$25,000.00</td>
-                                                            <td>면제 (0%)</td>
+                                                            <td>2</td><td class="td-left"></td><td></td><td class="td-money"></td><td class="td-money"></td><td></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>3</td><td class="td-left"></td><td></td><td class="td-money"></td><td class="td-money"></td><td></td>
                                                         </tr>
                                                         <tr>
                                                             <td colspan="4" style="text-align:right; font-weight:bold; background:#e2e8f0;">총 합계금액 (Total Amount)</td>
-                                                            <td class="td-money" style="font-weight:bold; background:#e2e8f0; color:#b91c1c;">$145,000.00</td>
+                                                            <td class="td-money" style="font-weight:bold; background:#e2e8f0; color:#b91c1c;"></td>
                                                             <td style="background:#e2e8f0;"></td>
                                                         </tr>
                                                     </tbody>
@@ -1110,9 +1121,9 @@ with tab3:
                                                 <div style="margin-top: 20px;">
                                                     <h4 style="margin-bottom: 5px;">[ 절차 이력 전체 ]</h4>
                                                     <ul style="font-size: 13px; line-height: 1.6; padding-left: 20px;">
-                                                        <li>[신고] 수출신고 접수 완료</li>
-                                                        <li>[수리] {acpt_dt_formatted} - 수출신고수리 승인</li>
-                                                        <li>[선적] {'기한 내 적재 완료' if is_loaded else f'{load_tmlm} 내 적재 대기'}</li>
+                                                        <li>[신고] {step1_title} 완료</li>
+                                                        <li>[수리] {acpt_dt_formatted} - {step2_title} 승인</li>
+                                                        <li>[선적] {'기한 내 적재/양하 완료' if is_loaded else f'{load_tmlm} 내 적재/양하 대기'}</li>
                                                     </ul>
                                                 </div>
                                                 <p style="text-align:center; margin-top:50px; font-size:12px; color:#555;">본 증명서는 관세청 통관시스템(UNIPASS) 전자문서와 동일함을 증명합니다.<br>이 문서는 열람 전용이며 공식 증명서로 사용할 수 없습니다.</p>
@@ -1123,22 +1134,22 @@ with tab3:
 
                                 <script>
                                     function openModal() {{
-                                        document.getElementById('myModal').style.display = "block";
+                                        document.getElementById('{modal_id}').style.display = "block";
                                         document.body.style.overflow = "hidden";
                                     }}
                                     
                                     function closeModal() {{
-                                        document.getElementById('myModal').style.display = "none";
+                                        document.getElementById('{modal_id}').style.display = "none";
                                         document.body.style.overflow = "auto";
                                     }}
                                     
                                     function closeModalOutside(event) {{
-                                        if (event.target == document.getElementById('myModal')) {{ closeModal(); }}
+                                        if (event.target == document.getElementById('{modal_id}')) {{ closeModal(); }}
                                     }}
                                     
                                     function downloadPDF() {{
                                         const {{ jsPDF }} = window.jspdf;
-                                        const printArea = document.getElementById('printArea');
+                                        const printArea = document.getElementById('printArea_{clean_no}');
                                         
                                         const originalBorder = printArea.style.border;
                                         printArea.style.border = 'none';
@@ -1150,14 +1161,15 @@ with tab3:
                                             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
                                             
                                             pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
-                                            pdf.save('수출신고필증_{data["expDclrNo"]}.pdf');
+                                            const fileName = "{'수입' if is_import else '수출'}신고필증_{data['expDclrNo']}.pdf";
+                                            pdf.save(fileName);
                                             
                                             printArea.style.border = originalBorder;
                                         }});
                                     }}
                                     
                                     function printForm() {{
-                                        const printContent = document.getElementById('printArea').innerHTML;
+                                        const printContent = document.getElementById('printArea_{clean_no}').innerHTML;
                                         const originalContent = document.body.innerHTML;
                                         document.body.innerHTML = printContent;
                                         window.print();
@@ -1170,7 +1182,7 @@ with tab3:
                             """
                             components.html(html_content, height=1500, scrolling=True)
                             
-                    else:
-                        st.error("❌ 해당 번호로 조회된 통관 데이터가 없습니다. 번호를 다시 확인해 주세요.")
+                    except Exception as e:
+                        st.error(f"⚠️ 유니패스 API 통신 오류 ({clean_no}): {e}")
                 except Exception as e:
                     st.error(f"⚠️ 유니패스 API 통신 오류: {e}")
