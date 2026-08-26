@@ -615,7 +615,39 @@ with tab3:
 
     def set_vessel(v):
         st.session_state.vessel_input_widget = v
-        
+        # 우측 선박 선택 시 좌측 유니패스 연동
+        imo_to_dclr = {
+            "9839430": "4177426003929X", # MSC GULSUN
+            "9863297": "1234567890123M", # HMM ALGECIRAS
+            "9863302": "4177426003706X"  # HMM COPENHAGEN
+        }
+        mapped_dclr = imo_to_dclr.get(v)
+        if mapped_dclr:
+            st.session_state.synced_dclr = mapped_dclr
+            st.session_state.dclr_input_widget = mapped_dclr
+            if mapped_dclr not in st.session_state.dclr_history:
+                st.session_state.dclr_history.insert(0, mapped_dclr)
+
+    def on_vessel_input_change():
+        v = st.session_state.vessel_input_widget
+        if v:
+            v = v.strip()
+            if v not in st.session_state.vessel_history:
+                st.session_state.vessel_history.insert(0, v)
+                if len(st.session_state.vessel_history) > 6:
+                    st.session_state.vessel_history = st.session_state.vessel_history[:6]
+            imo_to_dclr = {
+                "9839430": "4177426003929X",
+                "9863297": "1234567890123M",
+                "9863302": "4177426003706X"
+            }
+            mapped_dclr = imo_to_dclr.get(v)
+            if mapped_dclr:
+                st.session_state.synced_dclr = mapped_dclr
+                st.session_state.dclr_input_widget = mapped_dclr
+                if mapped_dclr not in st.session_state.dclr_history:
+                    st.session_state.dclr_history.insert(0, mapped_dclr)
+
     def del_vessel(v):
         if v in st.session_state.vessel_history:
             st.session_state.vessel_history.remove(v)
@@ -1207,34 +1239,9 @@ with tab3:
                 
             col_s1, col_s2 = st.columns([3, 1])
             with col_s1:
-                search_vessel = st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", key="vessel_input_widget", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
+                st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", key="vessel_input_widget", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)", on_change=on_vessel_input_change)
             
-            if search_vessel:
-                search_vessel = search_vessel.strip()
-                updated_state = False
-                if search_vessel not in st.session_state.vessel_history:
-                    st.session_state.vessel_history.insert(0, search_vessel)
-                    if len(st.session_state.vessel_history) > 6:
-                        st.session_state.vessel_history = st.session_state.vessel_history[:6]
-                    updated_state = True
-                    
-                # [상호 연동] 우측 선박 조회 시 좌측 유니패스 면장 자동 매칭 (데모)
-                imo_to_dclr = {
-                    "9839430": "4177426003929X", # MSC GULSUN
-                    "9863297": "1234567890123M", # HMM ALGECIRAS
-                    "9863302": "4177426003706X"  # HMM COPENHAGEN
-                }
-                mapped_dclr = imo_to_dclr.get(search_vessel)
-                
-                if mapped_dclr and st.session_state.synced_dclr != mapped_dclr:
-                    st.session_state.synced_dclr = mapped_dclr
-                    st.session_state.dclr_input_widget = mapped_dclr
-                    if mapped_dclr not in st.session_state.dclr_history:
-                        st.session_state.dclr_history.insert(0, mapped_dclr)
-                    updated_state = True
-                    
-                if updated_state:
-                    st.rerun() # Refresh to show new button and trigger left sync
+            search_vessel = st.session_state.get("vessel_input_widget", "")
             
             mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
             if search_vessel:
