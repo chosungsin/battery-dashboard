@@ -622,67 +622,7 @@ with tab3:
     with tab4:
         st.header(t.get('tab4', '🚢 해상 물류 및 수출입 통관 모니터링'))
         
-        # --- 1. 선박 조회 섹션 ---
-        st.subheader("🚢 실시간 선박 위치 및 기상 조회")
-        
-        if st.session_state.vessel_history:
-            st.markdown("⭐️ **관심 선박 목록 (클릭 시 1초 전환 토글)**")
-            hist_cols = st.columns(len(st.session_state.vessel_history) + 1)
-            for i, hist in enumerate(st.session_state.vessel_history):
-                btn_type = "primary" if hist == st.session_state.vessel_input_widget else "secondary"
-                hist_cols[i].button(f"🛳️ {hist}", key=f"hist_{hist}", on_click=set_vessel, args=(hist,), type=btn_type, use_container_width=True)
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-        col_s1, col_s2 = st.columns([3, 1])
-        with col_s1:
-            search_vessel = st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", key="vessel_input_widget", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
-        
-        if search_vessel:
-            search_vessel = search_vessel.strip()
-            if search_vessel not in st.session_state.vessel_history:
-                st.session_state.vessel_history.insert(0, search_vessel)
-                if len(st.session_state.vessel_history) > 6:
-                    st.session_state.vessel_history = st.session_state.vessel_history[:6]
-                st.rerun() # Refresh to show new button
-        
-        mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
-        if search_vessel:
-            if len(search_vessel) == 9 and search_vessel.isdigit():
-                mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
-            elif len(search_vessel) >= 7 and search_vessel.isdigit():
-                mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
-                
-        vesselfinder_html = f"""
-        <div style="margin-bottom: 20px;">
-            <div style="width: 100%; height: 500px;">
-                <script type="text/javascript">
-                    var width="100%";
-                    var height="500";
-                    var names=true;
-                    {mmsi_script}
-                </script>
-                <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
-            </div>
-        </div>
-        """
-        
-        windy_html = """
-        <div>
-            <h4 style="font-family: sans-serif; margin-bottom: 10px;">🌊 바다 날씨 및 풍랑 예측 (Windy)</h4>
-            <iframe 
-                width="100%" 
-                height="400" 
-                src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=kt&zoom=4&overlay=waves&product=ecmwf&level=surface&lat=35.0&lon=129.0" 
-                frameborder="0">
-            </iframe>
-        </div>
-        """
-        
-        import streamlit.components.v1 as components
-        components.html(vesselfinder_html + windy_html, height=950, scrolling=True)
-
-        # --- 2. 유니패스 수출입 통관 섹션 ---
-        st.markdown("---")
+        # --- 1. 유니패스 수출입 통관 섹션 ---
         st.subheader("📋 관세청 유니패스(UNIPASS) 실시간 연동 (다중 조회 지원)")
         
         if st.session_state.dclr_history:
@@ -1200,6 +1140,68 @@ with tab3:
                     except Exception as e:
                         st.error(f"⚠️ 유니패스 API 통신 오류 ({clean_no}): {e}")
 
+
+
+        st.markdown("---")
+
+        # --- 2. 선박 조회 섹션 ---
+        st.subheader("🚢 실시간 선박 위치 및 기상 조회")
+        
+        if st.session_state.vessel_history:
+            st.markdown("⭐️ **관심 선박 목록 (클릭 시 1초 전환 토글)**")
+            hist_cols = st.columns(len(st.session_state.vessel_history) + 1)
+            for i, hist in enumerate(st.session_state.vessel_history):
+                btn_type = "primary" if hist == st.session_state.vessel_input_widget else "secondary"
+                hist_cols[i].button(f"🛳️ {hist}", key=f"hist_{hist}", on_click=set_vessel, args=(hist,), type=btn_type, use_container_width=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+        col_s1, col_s2 = st.columns([3, 1])
+        with col_s1:
+            search_vessel = st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", key="vessel_input_widget", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
+        
+        if search_vessel:
+            search_vessel = search_vessel.strip()
+            if search_vessel not in st.session_state.vessel_history:
+                st.session_state.vessel_history.insert(0, search_vessel)
+                if len(st.session_state.vessel_history) > 6:
+                    st.session_state.vessel_history = st.session_state.vessel_history[:6]
+                st.rerun() # Refresh to show new button
+        
+        mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
+        if search_vessel:
+            if len(search_vessel) == 9 and search_vessel.isdigit():
+                mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
+            elif len(search_vessel) >= 7 and search_vessel.isdigit():
+                mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
+                
+        vesselfinder_html = f"""
+        <div style="margin-bottom: 20px;">
+            <div style="width: 100%; height: 500px;">
+                <script type="text/javascript">
+                    var width="100%";
+                    var height="500";
+                    var names=true;
+                    {mmsi_script}
+                </script>
+                <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+            </div>
+        </div>
+        """
+        
+        windy_html = """
+        <div>
+            <h4 style="font-family: sans-serif; margin-bottom: 10px;">🌊 바다 날씨 및 풍랑 예측 (Windy)</h4>
+            <iframe 
+                width="100%" 
+                height="400" 
+                src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=kt&zoom=4&overlay=waves&product=ecmwf&level=surface&lat=35.0&lon=129.0" 
+                frameborder="0">
+            </iframe>
+        </div>
+        """
+        
+        import streamlit.components.v1 as components
+        components.html(vesselfinder_html + windy_html, height=950, scrolling=True)
 
 with tab5:
     st.header("🇺🇸 미국 이차전지 부품 수출 관세율 변동 추이")
