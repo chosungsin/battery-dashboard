@@ -1184,8 +1184,6 @@ with tab3:
                             
                     except Exception as e:
                         st.error(f"⚠️ 유니패스 API 통신 오류 ({clean_no}): {e}")
-                except Exception as e:
-                    st.error(f"⚠️ 유니패스 API 통신 오류: {e}")
 
 
 with tab5:
