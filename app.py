@@ -1232,19 +1232,22 @@ with tab5:
     
     # 주요 이벤트 주석 추가 (IRA, 301조 인상)
     fig.add_annotation(
-        x=2024, y=25.0, text="<b>무역법 301조 제재 (2024)</b><br>중국산 25% 인상",
+        x=2024, y=25.0, text="<b>무역법 301조 제재 (24년 9월 27일)</b><br>중국산 25% 인상",
+        width=200,
         showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#ef4444",
         ax=-20, ay=-60, bgcolor="#fef2f2", bordercolor="#fca5a5", borderwidth=1, borderpad=4, font=dict(color="#7f1d1d")
     )
     
     fig.add_annotation(
-        x=2025, y=15.0, text="<b>트럼프 2기 출범 (2025)</b><br>한국산 보편적 관세 15%",
+        x=2025, y=15.0, text="<b>트럼프 2기 보편관세 (25년 2월 1일)</b><br>한국산 무관세 폐지 및 15% 부과",
+        width=220,
         showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#64748b",
         ax=-20, ay=-50, bgcolor="#f8fafc", bordercolor="#cbd5e1", borderwidth=1, borderpad=4, font=dict(color="#0f172a")
     )
     
     fig.add_annotation(
-        x=2026, y=12.5, text="<b>관세율 일부 완화 (2026)</b><br>최근 12.5%로 하향 조정",
+        x=2026, y=12.5, text="<b>관세율 일부 완화 (26년 7월 24일)</b><br>최근 12.5%로 하향 조정",
+        width=220,
         showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#10b981",
         ax=20, ay=40, bgcolor="#ecfdf5", bordercolor="#6ee7b7", borderwidth=1, borderpad=4, font=dict(color="#064e3b")
     )
@@ -1277,7 +1280,7 @@ with tab5:
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 20px;">
         <h4 style="margin-top: 0; color: #0f172a;"><i class="fa-solid fa-lightbulb" style="color: #f59e0b; margin-right: 8px;"></i> 주요 시사점 및 수출 전략</h4>
         <ul style="color: #334155; line-height: 1.6; margin-bottom: 0;">
-            <li><b>상대적 원가 우위 유지:</b> 트럼프 2기 정권의 통상 정책 변화로 작년(2025년) 15%의 보편 관세가 부과되었고 최근 <b>12.5%</b>로 일부 조정되었습니다. 무관세 혜택은 사라졌으나, 무역법 301조 제재로 25% 고율 관세를 맞는 중국산 분리막보다는 여전히 <b>12.5%p의 가격 경쟁력</b>을 우위로 점하고 있습니다.</li>
+            <li><b>상대적 원가 우위 유지:</b> 트럼프 2기 정권의 보편적 관세 행정명령 발효(<b>2025년 2월 1일</b>)로 15% 관세가 부과되었으나, 이후 양국 교섭을 통해 최근(<b>2026년 7월 24일</b>) <b>12.5%</b>로 일부 조정되었습니다. 비록 0% 무관세 시대는 끝났으나, 무역법 301조 제재(<b>2024년 9월 27일</b> 시행)로 25% 고율 관세를 맞는 중국산 분리막보다는 여전히 <b>12.5%p의 가격 경쟁력</b> 우위를 점하고 있습니다.</li>
             <li><b>현지화(On-shoring) 및 공급망 다변화:</b> 미국 내 관세 장벽이 점차 높아짐에 따라 북미 현지 완성차 업체들의 부품 단가 압박이 예상됩니다. 당사 분리막 제품의 수출 이익률 방어를 위해 멕시코/미국 현지 공장 합작 투자를 검토하거나 원가 절감 태스크포스(TF) 가동이 권장됩니다.</li>
             <li><b>통관 리스크 및 예외 조항 모니터링:</b> 최근 관세율이 15%에서 12.5%로 인하된 것처럼, 미국 행정부의 특정 품목 예외(Exclusion) 조치나 한미 간 추가 협상에 따라 관세율은 유동적일 수 있습니다. 유니패스 연동 시스템을 통해 실제 적용된 수출 통관 내역을 상시 모니터링하시기 바랍니다.</li>
         </ul>
