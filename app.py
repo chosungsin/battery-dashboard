@@ -1188,14 +1188,14 @@ with tab3:
 
 with tab5:
     st.header("🇺🇸 미국 이차전지 부품 수출 관세율 변동 추이")
-    st.markdown("미국으로 수출되는 이차전지 부품(HS Code 8507.90 등)에 대한 국가별 적용 관세율 비교 및 정책 동향입니다. 한국은 한-미 FTA 발효 이후 무관세 혜택을 누리고 있는 반면, 중국산 부품은 무역법 301조에 따른 제재 관세가 부과되고 있습니다.")
+    st.markdown("미국으로 수출되는 이차전지 분리막 등 대미 주요 수출 부품에 대한 국가별 적용 관세율 비교 및 정책 동향입니다. 한국은 한-미 FTA 무관세 혜택을 누려왔으나, 최근 트럼프 2기 정권 출범 이후 보편 관세가 적용되는 등 급격한 정책 변화를 겪고 있습니다. 중국산 부품은 무역법 301조에 따른 제재 관세가 부과되고 있습니다.")
     
     import plotly.graph_objects as go
     import pandas as pd
     
     # 데이터 준비
     years = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
-    korea_rates = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    korea_rates = [0, 0, 0, 0, 0, 0, 0, 15.0, 12.5]
     china_rates = [0, 7.5, 7.5, 7.5, 7.5, 7.5, 25.0, 25.0, 25.0]
     
     df_tariff = pd.DataFrame({
@@ -1210,7 +1210,7 @@ with tab5:
     fig.add_trace(go.Scatter(
         x=df_tariff['Year'], y=df_tariff['Korea (KORUS FTA)'],
         mode='lines+markers+text',
-        name='한국산 (무관세 적용)',
+        name='한국산 (분리막 등)',
         line=dict(color='#10b981', width=4),
         marker=dict(size=10),
         text=[f"{r}%" for r in korea_rates],
@@ -1232,23 +1232,29 @@ with tab5:
     
     # 주요 이벤트 주석 추가 (IRA, 301조 인상)
     fig.add_annotation(
-        x=2022, y=5,
-        text="<b>IRA 법안 통과 (2022)</b><br>공급망 탈중국 가속화",
-        showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#64748b",
-        ax=0, ay=-40,
-        bgcolor="#f1f5f9", bordercolor="#cbd5e1", borderwidth=1, borderpad=4
+        x=2024, y=25.0, text="<b>무역법 301조 제재 (2024)</b><br>중국산 25% 인상",
+        showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#ef4444",
+        ax=-20, ay=-60, bgcolor="#fef2f2", bordercolor="#fca5a5", borderwidth=1, borderpad=4, font=dict(color="#7f1d1d")
     )
     
     fig.add_annotation(
-        x=2024, y=28.4,
-        text="<b>무역법 301조 제재 인상 (2024)</b><br>배터리 부품 관세 25% 추가 부과",
+        x=2025, y=15.0, text="<b>트럼프 2기 출범 (2025)</b><br>한국산 보편적 관세 15%",
+        showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#64748b",
+        ax=-20, ay=-50, bgcolor="#f8fafc", bordercolor="#cbd5e1", borderwidth=1, borderpad=4, font=dict(color="#0f172a")
+    )
+    
+    fig.add_annotation(
+        x=2026, y=12.5, text="<b>관세율 일부 완화 (2026)</b><br>최근 12.5%로 하향 조정",
+        showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#10b981",
+        ax=20, ay=40, bgcolor="#ecfdf5", bordercolor="#6ee7b7", borderwidth=1, borderpad=4, font=dict(color="#064e3b")
+    )</b><br>배터리 부품 관세 25% 추가 부과",
         showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#ef4444",
         ax=-20, ay=-60,
         bgcolor="#fef2f2", bordercolor="#fca5a5", borderwidth=1, borderpad=4
     )
     
     fig.update_layout(
-        title="이차전지 부품(HS 8507.90) 미국 수입 관세율 변동 추이",
+        title="이차전지 분리막 대미 수출 관세율 변동 추이",
         xaxis_title="연도",
         yaxis_title="관세율 (%)",
         yaxis=dict(range=[-5, 40], ticksuffix="%"),
@@ -1276,9 +1282,9 @@ with tab5:
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 20px;">
         <h4 style="margin-top: 0; color: #0f172a;"><i class="fa-solid fa-lightbulb" style="color: #f59e0b; margin-right: 8px;"></i> 주요 시사점 및 수출 전략</h4>
         <ul style="color: #334155; line-height: 1.6; margin-bottom: 0;">
-            <li><b>원가 경쟁력 확보:</b> 한국산 배터리 부품은 한미 FTA에 따라 <b>0% 무관세 혜택</b>을 지속적으로 유지하고 있어, 25% 이상의 고율 관세가 부과되는 중국산 대비 미국 시장 내 확고한 가격 경쟁력을 지니고 있습니다.</li>
-            <li><b>IRA 기반 공급망 재편 기회:</b> 미국 IRA(인플레이션 감축법)의 배터리 부품 요건 강화에 따라 북미 현지 완성차 업체들의 '탈중국 부품 벤더' 수요가 폭발적으로 증가하고 있습니다. 당사의 <b>NCM 양극재 811 및 알루미늄 케이스</b> 수출 물량 확대를 위한 적극적인 영업 전개가 권장됩니다.</li>
-            <li><b>통관 리스크 관리:</b> 무관세 혜택을 적용받기 위해서는 철저한 <b>원산지 증명(원산지 결정기준 충족 여부)</b> 관리가 필수적입니다. 유니패스 연동 시스템을 통해 실시간 면장 및 C/O(원산지증명서) 발급 현황을 면밀히 모니터링하시기 바랍니다.</li>
+            <li><b>상대적 원가 우위 유지:</b> 트럼프 2기 정권의 통상 정책 변화로 작년(2025년) 15%의 보편 관세가 부과되었고 최근 <b>12.5%</b>로 일부 조정되었습니다. 무관세 혜택은 사라졌으나, 무역법 301조 제재로 25% 고율 관세를 맞는 중국산 분리막보다는 여전히 <b>12.5%p의 가격 경쟁력</b>을 우위로 점하고 있습니다.</li>
+            <li><b>현지화(On-shoring) 및 공급망 다변화:</b> 미국 내 관세 장벽이 점차 높아짐에 따라 북미 현지 완성차 업체들의 부품 단가 압박이 예상됩니다. 당사 분리막 제품의 수출 이익률 방어를 위해 멕시코/미국 현지 공장 합작 투자를 검토하거나 원가 절감 태스크포스(TF) 가동이 권장됩니다.</li>
+            <li><b>통관 리스크 및 예외 조항 모니터링:</b> 최근 관세율이 15%에서 12.5%로 인하된 것처럼, 미국 행정부의 특정 품목 예외(Exclusion) 조치나 한미 간 추가 협상에 따라 관세율은 유동적일 수 있습니다. 유니패스 연동 시스템을 통해 실제 적용된 수출 통관 내역을 상시 모니터링하시기 바랍니다.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
