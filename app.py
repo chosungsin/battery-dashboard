@@ -1247,10 +1247,6 @@ with tab5:
         x=2026, y=12.5, text="<b>관세율 일부 완화 (2026)</b><br>최근 12.5%로 하향 조정",
         showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#10b981",
         ax=20, ay=40, bgcolor="#ecfdf5", bordercolor="#6ee7b7", borderwidth=1, borderpad=4, font=dict(color="#064e3b")
-    )</b><br>배터리 부품 관세 25% 추가 부과",
-        showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="#ef4444",
-        ax=-20, ay=-60,
-        bgcolor="#fef2f2", bordercolor="#fca5a5", borderwidth=1, borderpad=4
     )
     
     fig.update_layout(
@@ -1259,7 +1255,6 @@ with tab5:
         yaxis_title="관세율 (%)",
         yaxis=dict(range=[-5, 40], ticksuffix="%"),
         xaxis=dict(tickmode='linear', tick0=2018, dtick=1),
-        plot_bgcolor="white",
         hovermode="x unified",
         legend=dict(
             orientation="h",
