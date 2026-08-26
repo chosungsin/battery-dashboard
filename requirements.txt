@@ -4,3 +4,4 @@ plotly
 requests
 yfinance
 python-dateutil
+beautifulsoup4

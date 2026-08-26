@@ -637,571 +637,596 @@ with tab3:
         st.info("💡 여러 건을 동시에 조회하려면 쉼표(,)로 구분하여 입력하세요. 예: `4177426003706X, 1234567890123M`")
         dclr_no_raw = st.text_input("🔍 수출입신고번호 14~15자리 입력", key="dclr_input_widget", placeholder="예: 4177426003706X")
         
-        if dclr_no_raw:
-            import requests
-            import xml.etree.ElementTree as ET
-            from datetime import datetime
-            import urllib3
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            
-            def get_realtime_eta_and_imo(query):
-                # Hardcoded robust mock for seamless demo experience (VesselFinder details are blocked by 403)
-                mock_db = {
-                    "HMM ALGECIRAS": {"imo": "9863297", "mmsi": "352002000", "callsign": "3E2345", "flag": "Panama (PA)", "eta": "2026-08-30 14:00"},
-                    "HMM COPENHAGEN": {"imo": "9863302", "mmsi": "352002001", "callsign": "3E2346", "flag": "Panama (PA)", "eta": "2026-09-02 10:00"},
-                    "MSC GULSUN": {"imo": "9839430", "mmsi": "353000000", "callsign": "3E4444", "flag": "Panama (PA)", "eta": "2026-08-28 09:00"}
-                }
-                query_upper = query.upper()
-                for k, v in mock_db.items():
-                    if k in query_upper or query_upper in k:
-                        return v
-                
-                # Fallback to scraping just for IMO
-                from bs4 import BeautifulSoup
+        main_col1, main_col2 = st.columns([1.1, 1], gap="large")
+        
+        with main_col1:
+            if dclr_no_raw:
                 import requests
-                headers = {'User-Agent': 'Mozilla/5.0'}
-                try:
-                    res = requests.get(f"https://www.vesselfinder.com/vessels?name={query}", headers=headers, timeout=5)
-                    soup = BeautifulSoup(res.text, 'html.parser')
-                    link = soup.select_one('a.ship-link')
-                    if link:
-                        href = link.get('href')
-                        imo = href.split('/')[-1] if href else None
-                        return {"imo": imo, "mmsi": "조회불가(API제한)", "callsign": "조회불가", "flag": "조회불가", "eta": None}
-                except:
-                    pass
-                return {"imo": None, "mmsi": "미상", "callsign": "미상", "flag": "미상", "eta": None}
-            
-            # 다중 입력 처리
-            dclr_list = [x.strip().replace("-", "") for x in dclr_no_raw.split(",") if x.strip()]
-            
-            # 이력에 추가 (개별 건으로 쪼개서)
-            history_updated = False
-            for d_no in dclr_list:
-                if d_no not in st.session_state.dclr_history:
-                    st.session_state.dclr_history.insert(0, d_no)
-                    history_updated = True
-            
-            if len(st.session_state.dclr_history) > 10:
-                st.session_state.dclr_history = st.session_state.dclr_history[:10]
+                import xml.etree.ElementTree as ET
+                from datetime import datetime
+                import urllib3
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
                 
-            if history_updated:
-                st.rerun()
-
-            with st.spinner(f"총 {len(dclr_list)}건의 유니패스 데이터를 실시간 조회 중입니다..."):
-                unipass_key = "o260d286z008x204x010n090j2"
-                
-                # Auto-sync is triggered by the FIRST declaration only to avoid chaotic map jumps
-                synced_this_run = False
-                
-                for idx, clean_no in enumerate(dclr_list):
-                    url = f"https://unipass.customs.go.kr:38010/ext/rest/expDclrNoPrExpFfmnBrkdQry/retrieveExpDclrNoPrExpFfmnBrkd?crkyCn={unipass_key}&expDclrNo={clean_no}"
+                def get_realtime_eta_and_imo(query):
+                    # Hardcoded robust mock for seamless demo experience (VesselFinder details are blocked by 403)
+                    mock_db = {
+                        "HMM ALGECIRAS": {"imo": "9863297", "mmsi": "352002000", "callsign": "3E2345", "flag": "Panama (PA)", "eta": "2026-08-30 14:00"},
+                        "HMM COPENHAGEN": {"imo": "9863302", "mmsi": "352002001", "callsign": "3E2346", "flag": "Panama (PA)", "eta": "2026-09-02 10:00"},
+                        "MSC GULSUN": {"imo": "9839430", "mmsi": "353000000", "callsign": "3E4444", "flag": "Panama (PA)", "eta": "2026-08-28 09:00"}
+                    }
+                    query_upper = query.upper()
+                    for k, v in mock_db.items():
+                        if k in query_upper or query_upper in k:
+                            return v
                     
+                    # Fallback to scraping just for IMO
+                    from bs4 import BeautifulSoup
+                    import requests
+                    headers = {'User-Agent': 'Mozilla/5.0'}
                     try:
-                        res = requests.get(url, verify=False, timeout=10)
-                        root = ET.fromstring(res.content)
-                        t_cnt = root.findtext('tCnt')
+                        res = requests.get(f"https://www.vesselfinder.com/vessels?name={query}", headers=headers, timeout=5)
+                        soup = BeautifulSoup(res.text, 'html.parser')
+                        link = soup.select_one('a.ship-link')
+                        if link:
+                            href = link.get('href')
+                            imo = href.split('/')[-1] if href else None
+                            return {"imo": imo, "mmsi": "조회불가(API제한)", "callsign": "조회불가", "flag": "조회불가", "eta": None}
+                    except:
+                        pass
+                    return {"imo": None, "mmsi": "미상", "callsign": "미상", "flag": "미상", "eta": None}
+                
+                # 다중 입력 처리
+                dclr_list = [x.strip().replace("-", "") for x in dclr_no_raw.split(",") if x.strip()]
+                
+                # 이력에 추가 (개별 건으로 쪼개서)
+                history_updated = False
+                for d_no in dclr_list:
+                    if d_no not in st.session_state.dclr_history:
+                        st.session_state.dclr_history.insert(0, d_no)
+                        history_updated = True
+                
+                if len(st.session_state.dclr_history) > 10:
+                    st.session_state.dclr_history = st.session_state.dclr_history[:10]
+                    
+                if history_updated:
+                    st.rerun()
+
+                with st.spinner(f"총 {len(dclr_list)}건의 유니패스 데이터를 실시간 조회 중입니다..."):
+                    unipass_key = "o260d286z008x204x010n090j2"
+                    
+                    # Auto-sync is triggered by the FIRST declaration only to avoid chaotic map jumps
+                    synced_this_run = False
+                    
+                    for idx, clean_no in enumerate(dclr_list):
+                        url = f"https://unipass.customs.go.kr:38010/ext/rest/expDclrNoPrExpFfmnBrkdQry/retrieveExpDclrNoPrExpFfmnBrkd?crkyCn={unipass_key}&expDclrNo={clean_no}"
                         
-                        is_import = False
-                        data = None
-                        
-                        if t_cnt and t_cnt != "0":
-                            item = root.find('expDclrNoPrExpFfmnBrkdQryRsltVo')
-                            if item is not None:
+                        try:
+                            res = requests.get(url, verify=False, timeout=10)
+                            root = ET.fromstring(res.content)
+                            t_cnt = root.findtext('tCnt')
+                            
+                            is_import = False
+                            data = None
+                            
+                            if t_cnt and t_cnt != "0":
+                                item = root.find('expDclrNoPrExpFfmnBrkdQryRsltVo')
+                                if item is not None:
+                                    data = {
+                                        'expDclrNo': item.findtext('expDclrNo', ''),
+                                        'acptDt': item.findtext('acptDt', ''),
+                                        'exppnConm': item.findtext('exppnConm', ''),
+                                        'sanm': item.findtext('sanm', ''),
+                                        'loadDtyTmlm': item.findtext('loadDtyTmlm', ''),
+                                        'shpmCmplYn': item.findtext('shpmCmplYn', ''),
+                                        'csclPckUt': item.findtext('csclPckUt', ''),
+                                    }
+                                    is_import = False
+                            else:
+                                # 수출이행내역(API002)에서 조회가 안 될 경우 수입신고번호로 간주 (데모 연동)
+                                if idx == 0:
+                                    st.info("💡 유니패스 수출API(API002)에서 조회되지 않아, **수입신고건**으로 간주하여 화면과 지도를 연동합니다. (실제 수입 API 연동 전 데모)")
                                 data = {
-                                    'expDclrNo': item.findtext('expDclrNo', ''),
-                                    'acptDt': item.findtext('acptDt', ''),
-                                    'exppnConm': item.findtext('exppnConm', ''),
-                                    'sanm': item.findtext('sanm', ''),
-                                    'loadDtyTmlm': item.findtext('loadDtyTmlm', ''),
-                                    'shpmCmplYn': item.findtext('shpmCmplYn', ''),
-                                    'csclPckUt': item.findtext('csclPckUt', ''),
+                                    'expDclrNo': clean_no,
+                                    'acptDt': '20260810',
+                                    'exppnConm': '수입화주 (주)테스트배터리',
+                                    'sanm': 'HMM ALGECIRAS', # 실제 배 이름 (VesselFinder 연동 테스트용)
+                                    'loadDtyTmlm': '20260830',
+                                    'shpmCmplYn': 'Y',
+                                    'csclPckUt': '120 PLT',
                                 }
-                                is_import = False
-                        else:
-                            # 수출이행내역(API002)에서 조회가 안 될 경우 수입신고번호로 간주 (데모 연동)
-                            if idx == 0:
-                                st.info("💡 유니패스 수출API(API002)에서 조회되지 않아, **수입신고건**으로 간주하여 화면과 지도를 연동합니다. (실제 수입 API 연동 전 데모)")
-                            data = {
-                                'expDclrNo': clean_no,
-                                'acptDt': '20260810',
-                                'exppnConm': '수입화주 (주)테스트배터리',
-                                'sanm': 'HMM ALGECIRAS', # 실제 배 이름 (VesselFinder 연동 테스트용)
-                                'loadDtyTmlm': '20260830',
-                                'shpmCmplYn': 'Y',
-                                'csclPckUt': '120 PLT',
-                            }
-                            is_import = True
-                            
-                        if data:
-                            sanm = data.get('sanm', '')
-                            
-                            # Auto-Sync Map Logic (only for the first item in the list)
-                            if idx == 0 and not synced_this_run:
-                                if st.session_state.synced_dclr != clean_no:
-                                    st.session_state.synced_dclr = clean_no
-                                    if sanm:
-                                        imo = get_realtime_eta_and_imo(sanm).get('imo')
-                                        if imo and imo.isdigit():
-                                            st.session_state.vessel_input_widget = imo
-                                            if imo not in st.session_state.vessel_history:
-                                                st.session_state.vessel_history.insert(0, imo)
-                                                if len(st.session_state.vessel_history) > 6:
-                                                    st.session_state.vessel_history = st.session_state.vessel_history[:6]
-                                            synced_this_run = True
-                                            st.rerun() # Refresh the page to show the map with new IMO
-                                        
-                            # Format dates nicely
-                            acpt_dt_formatted = data['acptDt']
-                            if len(acpt_dt_formatted) == 8: # YYYYMMDD
-                                acpt_dt_formatted = f"{acpt_dt_formatted[:4]}-{acpt_dt_formatted[4:6]}-{acpt_dt_formatted[6:8]} 09:40"
+                                is_import = True
                                 
-                            load_tmlm = data['loadDtyTmlm']
-                            load_date_obj = None
-                            if len(load_tmlm) == 8:
-                                try:
-                                    load_date_obj = datetime.strptime(load_tmlm, "%Y%m%d")
-                                    load_tmlm = f"{load_tmlm[:4]}-{load_tmlm[4:6]}-{load_tmlm[6:8]}"
-                                except:
-                                    pass
+                            if data:
+                                sanm = data.get('sanm', '')
                                 
-                            is_loaded = data['shpmCmplYn'] == 'Y'
-                            
-                            # Real-time ETA Scrape
-                            query_term = sanm
-                            vf_eta_str = None
-                            vf_dt = None
-                            mmsi = "미상"
-                            callsign = "미상"
-                            flag = "미상"
-                            imo_val = "미상"
-                            if query_term:
-                                vf_data = get_realtime_eta_and_imo(query_term)
-                                vf_eta_str = vf_data.get('eta')
-                                mmsi = vf_data.get('mmsi', '미상')
-                                callsign = vf_data.get('callsign', '미상')
-                                flag = vf_data.get('flag', '미상')
-                                imo_val = vf_data.get('imo') or '미상'
-                                if vf_eta_str:
+                                # Auto-Sync Map Logic (only for the first item in the list)
+                                if idx == 0 and not synced_this_run:
+                                    if st.session_state.synced_dclr != clean_no:
+                                        st.session_state.synced_dclr = clean_no
+                                        if sanm:
+                                            imo = get_realtime_eta_and_imo(sanm).get('imo')
+                                            if imo and imo.isdigit():
+                                                st.session_state.vessel_input_widget = imo
+                                                if imo not in st.session_state.vessel_history:
+                                                    st.session_state.vessel_history.insert(0, imo)
+                                                    if len(st.session_state.vessel_history) > 6:
+                                                        st.session_state.vessel_history = st.session_state.vessel_history[:6]
+                                                synced_this_run = True
+                                                st.rerun() # Refresh the page to show the map with new IMO
+                                            
+                                # Format dates nicely
+                                acpt_dt_formatted = data['acptDt']
+                                if len(acpt_dt_formatted) == 8: # YYYYMMDD
+                                    acpt_dt_formatted = f"{acpt_dt_formatted[:4]}-{acpt_dt_formatted[4:6]}-{acpt_dt_formatted[6:8]} 09:40"
+                                    
+                                load_tmlm = data['loadDtyTmlm']
+                                load_date_obj = None
+                                if len(load_tmlm) == 8:
                                     try:
-                                        clean_str = vf_eta_str.replace("ETA:", "").strip()
-                                        current_year = datetime.now().year
-                                        vf_dt = datetime.strptime(f"{current_year} {clean_str}", "%Y %b %d, %H:%M")
+                                        load_date_obj = datetime.strptime(load_tmlm, "%Y%m%d")
+                                        load_tmlm = f"{load_tmlm[:4]}-{load_tmlm[4:6]}-{load_tmlm[6:8]}"
                                     except:
                                         pass
-                            
-                            # Compare ETAs
-                            final_eta_display = f"{load_tmlm} ({'서류상 입항 기한' if is_import else '서류상 적재/도착 기한'})"
-                            eta_warning_html = ""
-                            is_delayed = False
-                            
-                            if vf_dt and load_date_obj:
-                                if vf_dt > load_date_obj:
-                                    is_delayed = True
-                                    final_eta_display = f"{vf_dt.strftime('%Y년 %m월 %d일 %H:%M')} (VesselFinder 실시간 ETA 적용)"
-                                    eta_warning_html = '<br><span style="color:#ef4444; font-size:12px; font-weight:bold;">⚠️ 서류상 일정보다 지연됨</span>'
-                                else:
-                                    final_eta_display = f"{vf_dt.strftime('%Y년 %m월 %d일 %H:%M')} (VesselFinder 실시간 ETA 적용)"
-                                    eta_warning_html = '<br><span style="color:#10b981; font-size:12px; font-weight:bold;">✅ 기한 내 정상 도착 예정</span>'
-                            
-                            doc_title = "수 입 신 고 필 증" if is_import else "수 출 신 고 필 증"
-                            doc_type_pill = "📥 수입" if is_import else "📦 수출"
-                            incoterms = "CIF" if is_import else "FOB"
-                            incoterms_desc = "매도인이 목적항까지 비용 부담" if is_import else "매도인이 선적항에서 선박에 적재할 때까지 위험/비용 부담"
-                            pol_desc = "해외 출발항" if is_import else "부산항 (KRBUS)"
-                            pod_desc = "부산항 (KRBUS)" if is_import else "해외 목적항 (예상)"
-                            step1_title = "수입신고 접수" if is_import else "수출신고 접수 (Export Declaration)"
-                            step2_title = "수입신고 수리" if is_import else "수출신고 수리 (Clearance Approved)"
-                            
-                            modal_id = f"myModal_{clean_no}"
-                            
-                            html_content = f"""
-                            <!DOCTYPE html>
-                            <html>
-                            <head>
-                                <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-                                <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-                                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-                                <style>
-                                    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-                                    body {{ font-family: 'Pretendard', sans-serif; margin: 0; padding: 20px; background-color: #f1f5f9; color: #1e293b; }}
                                     
-                                    .card {{ background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 24px; }}
-                                    .card-title {{ display: flex; align-items: center; font-size: 18px; font-weight: 700; margin-bottom: 24px; color: #0f172a; }}
-                                    .card-title i {{ color: #10b981; margin-right: 10px; font-size: 20px; }}
-                                    .card-title.unipass i {{ color: #d4af37; }}
-                                    
-                                    /* Timeline (Itinerary) */
-                                    .timeline-container {{ position: relative; padding: 10px 0; margin-bottom: 10px; }}
-                                    .timeline-line {{ position: absolute; top: 25px; left: 10%; right: 10%; height: 4px; background: #e2e8f0; z-index: 1; }}
-                                    .timeline-steps {{ display: flex; justify-content: space-between; position: relative; z-index: 2; }}
-                                    .step {{ display: flex; flex-direction: column; align-items: center; width: 33%; }}
-                                    .step-icon {{ width: 32px; height: 32px; border-radius: 50%; background: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-bottom: 12px; border: 4px solid white; box-shadow: 0 0 0 1px #e2e8f0; }}
-                                    .step-icon.delayed {{ background: #ef4444; }}
-                                    .step-title {{ font-weight: 700; font-size: 14px; margin-bottom: 6px; }}
-                                    .step-date {{ background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 20px; font-size: 12px; border: 1px solid #a7f3d0; }}
-                                    .step-date.delayed {{ background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }}
-                                    
-                                    /* Info Pills */
-                                    .pills-container {{ display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }}
-                                    .pill {{ padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; }}
-                                    .pill-green {{ background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; }}
-                                    .pill-yellow {{ background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }}
-                                    .pill-gray {{ background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }}
-                                    .count-badge {{ background: #f1f5f9; border: 1px solid #e2e8f0; padding: 4px 12px; border-radius: 20px; font-size: 13px; margin-left: auto; color: #64748b; font-weight: 600; }}
-                                    
-                                    /* Table */
-                                    table.history-table {{ width: 100%; border-collapse: collapse; }}
-                                    table.history-table th {{ padding: 16px; text-align: left; font-size: 13px; color: #64748b; border-bottom: 2px solid #e2e8f0; font-weight: 600; }}
-                                    table.history-table td {{ padding: 20px 16px; font-size: 14px; color: #334155; vertical-align: middle; border-bottom: 1px solid #f1f5f9; line-height: 1.4; }}
-                                    table.history-table tr.row-blue {{ background-color: #eff6ff; }}
-                                    table.history-table tr.row-green {{ background-color: #f0fdf4; }}
-                                    table.history-table tr.row-red {{ background-color: #fef2f2; }}
-                                    
-                                    .status-complete {{ display: inline-flex; flex-direction: column; align-items: center; background: #d1fae5; color: #047857; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #a7f3d0; font-weight: bold; }}
-                                    .status-pending {{ display: inline-flex; flex-direction: column; align-items: center; background: #fef3c7; color: #d97706; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #fde68a; font-weight: bold; }}
-                                    .status-delayed {{ display: inline-flex; flex-direction: column; align-items: center; background: #fee2e2; color: #b91c1c; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #fecaca; font-weight: bold; }}
-                                    
-                                    /* View Document Badge */
-                                    .badge-view {{
-                                        display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-                                        background: #6366f1; color: white; border-radius: 20px; padding: 8px 16px;
-                                        font-size: 12px; font-weight: bold; cursor: pointer; margin-left: 10px;
-                                        box-shadow: 0 4px 10px rgba(99,102,241,0.3); transition: transform 0.2s;
-                                        vertical-align: middle;
-                                    }}
-                                    .badge-view:hover {{ transform: scale(1.05); }}
-                                    .badge-view i {{ font-size: 16px; margin-bottom: 2px; }}
-                                    
-                                    /* Modal Styles */
-                                    .modal {{ display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }}
-                                    .modal-content {{ background-color: white; margin: 2% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }}
-                                    .close-btn {{ position: absolute; right: 25px; top: 25px; font-size: 24px; cursor: pointer; color: #94a3b8; background: none; border: none; }}
-                                    .close-btn:hover {{ color: #0f172a; }}
-                                    
-                                    /* Form Styles (For PDF) */
-                                    #printArea {{ padding: 20px; background: white; }}
-                                    .form-title {{ text-align: center; text-decoration: underline; letter-spacing: 15px; margin-bottom: 40px; font-size: 28px; color: black; }}
-                                    .declaration-table {{ width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; color: black; margin-bottom: 20px; }}
-                                    .declaration-table th, .declaration-table td {{ border: 1px solid #000; padding: 12px; }}
-                                    .declaration-table th {{ background: #f8f9fa; width: 22%; }}
-                                    
-                                    .items-table {{ width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; color: black; margin-bottom: 20px; border: 1px solid #000; }}
-                                    .items-table th {{ background: #e2e8f0; padding: 10px; border: 1px solid #000; font-weight: bold; }}
-                                    .items-table td {{ padding: 10px; border: 1px solid #000; height: 35px; }}
-                                    .items-table .td-money {{ text-align: right; }}
-                                    .items-table .td-left {{ text-align: left; }}
-                                    
-                                    .btn-group {{ display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; }}
-                                    .btn-pdf {{ background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px; }}
-                                    .btn-print {{ background: #10b981; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px; }}
-                                    
-                                    .footer-text {{ font-size: 12px; color: #94a3b8; margin-top: 16px; margin-left: 8px; }}
-                                    
-                                    .watermark {{ position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 120px; color: rgba(220, 220, 220, 0.3); z-index: 0; pointer-events: none; font-weight: bold; user-select: none; white-space: nowrap; }}
-                                    .content-over-watermark {{ position: relative; z-index: 1; }}
-                                </style>
-                            </head>
-                            <body>
-                                <!-- Top Card: Itinerary -->
-                                <div class="card">
-                                    <div class="card-title">
-                                        <i class="fa-solid fa-location-dot"></i> 선박 경유지 현황 (Itinerary)
-                                    </div>
-                                    <div class="timeline-container">
-                                        <div class="timeline-line"></div>
-                                        <div class="timeline-steps">
-                                            <div class="step">
-                                                <div class="step-icon"><i class="fa-solid fa-check"></i></div>
-                                                <div class="step-title">{step2_title}</div>
-                                                <div class="step-date">{acpt_dt_formatted}</div>
-                                            </div>
-                                            <div class="step">
-                                                <div class="step-icon {'' if is_loaded else 'pending'}"><i class="fa-solid {'fa-check' if is_loaded else 'fa-clock'}"></i></div>
-                                                <div class="step-title" style="color:{'inherit' if is_loaded else '#64748b'}">{pol_desc}</div>
-                                                <div class="step-date {'' if is_loaded else 'pending'}">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (출항 예정)"}</div>
-                                            </div>
-                                            <div class="step">
-                                                <div class="step-icon {'delayed' if is_delayed else 'pending'}"><i class="fa-solid {'fa-triangle-exclamation' if is_delayed else 'fa-ship'}"></i></div>
-                                                <div class="step-title" style="color:{'#ef4444' if is_delayed else '#64748b'}">{pod_desc}</div>
-                                                <div class="step-date {'delayed' if is_delayed else 'pending'}">{final_eta_display}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Bottom Card: History -->
-                                <div class="card">
-                                    <div style="display:flex; align-items:center; margin-bottom: 24px;">
-                                        <div class="card-title unipass" style="margin-bottom:0;">
-                                            <i class="fa-solid fa-building-columns"></i> 관세청 유니패스 — 절차별 처리현황 [{clean_no}]
-                                        </div>
-                                        <div class="count-badge">총 4건</div>
-                                    </div>
-                                    
-                                    <div class="pills-container">
-                                        <div class="pill pill-green">{doc_type_pill} &nbsp;|&nbsp; 조회유형: {'수입신고번호' if is_import else '수출신고번호'}</div>
-                                        <div class="pill pill-yellow"><b style="color:#d97706;">{incoterms}</b> &nbsp;{incoterms_desc}</div>
-                                        <div class="pill pill-gray">📍 {pol_desc} &nbsp;&rarr;&nbsp; 🏁 {pod_desc}</div>
-                                    </div>
-                                    
-                                    <table class="history-table">
-                                        <thead>
-                                            <tr>
-                                                <th style="width:5%">#</th>
-                                                <th style="width:28%">처리 단계</th>
-                                                <th style="width:28%">처리 일시</th>
-                                                <th style="width:20%">처리 장소</th>
-                                                <th style="width:8%">상태</th>
-                                                <th style="width:11%">비고</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style="color:#94a3b8;">1</td>
-                                                <td style="font-weight:600;">{step1_title}</td>
-                                                <td style="font-family:monospace;">{acpt_dt_formatted}</td>
-                                                <td style="color:#64748b;">관세사 / 세관 EDI</td>
-                                                <td><div class="status-complete"><i class="fa-solid fa-check"></i>완료</div></td>
-                                                <td></td>
-                                            </tr>
-                                            <tr class="row-blue">
-                                                <td style="color:#94a3b8;">2</td>
-                                                <td style="font-weight:700; color:#1d4ed8; display:flex; align-items:center;">
-                                                    {step2_title}
-                                                    <div class="badge-view" onclick="openModal()">📋 <span>면장 보기</span></div>
-                                                </td>
-                                                <td style="font-family:monospace;">{acpt_dt_formatted}</td>
-                                                <td style="color:#64748b;">관세청</td>
-                                                <td><div class="status-complete"><i class="fa-solid fa-check"></i>완료</div></td>
-                                                <td style="color:#64748b; font-size:12px;">신고번호:<br>{data['expDclrNo']}</td>
-                                            </tr>
-                                            <tr>
-                                                <td style="color:#94a3b8;">3</td>
-                                                <td style="font-weight:600;">{'양하 완료 (Cargo Discharged)' if is_import else '선적 완료 (Cargo Loaded)'}</td>
-                                                <td style="font-family:monospace;">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (예정)"}</td>
-                                                <td style="color:#64748b;">{pol_desc} / {data.get('sanm', '미상')}</td>
-                                                <td>
-                                                    { '<div class="status-complete"><i class="fa-solid fa-check"></i>완료</div>' if is_loaded else '<div class="status-pending"><i class="fa-solid fa-clock"></i>미완료(예상)</div>' }
-                                                </td>
-                                                <td></td>
-                                            </tr>
-                                            <tr class="{'row-red' if is_delayed else 'row-green'}">
-                                                <td style="color:#94a3b8;">4</td>
-                                                <td style="font-weight:700; color:{'#ef4444' if is_delayed else '#047857'};"><span style="color:{'#ef4444' if is_delayed else '#10b981'}; font-size:18px; margin-right:5px;">●</span>{pod_desc} 도착 예정</td>
-                                                <td style="font-family:monospace;">{final_eta_display} {eta_warning_html}</td>
-                                                <td style="color:#64748b;">{pod_desc}</td>
-                                                <td>{ '<div class="status-delayed"><i class="fa-solid fa-triangle-exclamation"></i>지연</div>' if is_delayed else '<div class="status-pending"><i class="fa-solid fa-clock"></i>미완료(예상)</div>' }</td>
-                                                <td></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="footer-text">※ 출처: 관세청 유니패스(UNI-PASS) 및 VesselFinder 실시간 조회 데이터 · 최종 단계가 현재 처리 상태입니다.</div>
-
-                                <!-- The Modal -->
-                                <div id="{modal_id}" class="modal" onclick="closeModalOutside(event)">
-                                    <div class="modal-content" onclick="event.stopPropagation()">
-                                        <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
-                                        <div class="btn-group">
-                                            <button class="btn-pdf" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF 다운로드</button>
-                                            <button class="btn-print" onclick="printForm()"><i class="fa-solid fa-print"></i> 인쇄하기</button>
-                                            <div style="margin-left:auto; display:flex; gap:10px;">
-                                                <button onclick="alert('💡 관세청 API 보안 정책상 상업송장(Invoice) 스캔 원본 파일은 외부로 제공되지 않습니다. 대신, 화면의 정보는 관세청에 신고된 데이터와 동일함을 보증합니다.')" style="background:#f1f5f9; color:#475569; padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">📄 인보이스(CI) 원본 보기</button>
-                                                <button onclick="alert('💡 관세청 API 보안 정책상 패킹리스트(P/L) 스캔 원본 파일은 외부로 제공되지 않습니다. 상세 패킹 내역은 하단의 포장수량({data['csclPckUt']}) 정보를 참조해주세요.')" style="background:#f1f5f9; color:#475569; padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">📦 패킹리스트(PL) 원본 보기</button>
-                                            </div>
-                                        </div>
+                                is_loaded = data['shpmCmplYn'] == 'Y'
+                                
+                                # Real-time ETA Scrape
+                                query_term = sanm
+                                vf_eta_str = None
+                                vf_dt = None
+                                mmsi = "미상"
+                                callsign = "미상"
+                                flag = "미상"
+                                imo_val = "미상"
+                                if query_term:
+                                    vf_data = get_realtime_eta_and_imo(query_term)
+                                    vf_eta_str = vf_data.get('eta')
+                                    mmsi = vf_data.get('mmsi', '미상')
+                                    callsign = vf_data.get('callsign', '미상')
+                                    flag = vf_data.get('flag', '미상')
+                                    imo_val = vf_data.get('imo') or '미상'
+                                    if vf_eta_str:
+                                        try:
+                                            clean_str = vf_eta_str.replace("ETA:", "").strip()
+                                            current_year = datetime.now().year
+                                            vf_dt = datetime.strptime(f"{current_year} {clean_str}", "%Y %b %d, %H:%M")
+                                        except:
+                                            pass
+                                
+                                # Compare ETAs
+                                final_eta_display = f"{load_tmlm} ({'서류상 입항 기한' if is_import else '서류상 적재/도착 기한'})"
+                                eta_warning_html = ""
+                                is_delayed = False
+                                
+                                if vf_dt and load_date_obj:
+                                    if vf_dt > load_date_obj:
+                                        is_delayed = True
+                                        final_eta_display = f"{vf_dt.strftime('%Y년 %m월 %d일 %H:%M')} (VesselFinder 실시간 ETA 적용)"
+                                        eta_warning_html = '<br><span style="color:#ef4444; font-size:12px; font-weight:bold;">⚠️ 서류상 일정보다 지연됨</span>'
+                                    else:
+                                        final_eta_display = f"{vf_dt.strftime('%Y년 %m월 %d일 %H:%M')} (VesselFinder 실시간 ETA 적용)"
+                                        eta_warning_html = '<br><span style="color:#10b981; font-size:12px; font-weight:bold;">✅ 기한 내 정상 도착 예정</span>'
+                                
+                                doc_title = "수 입 신 고 필 증" if is_import else "수 출 신 고 필 증"
+                                doc_type_pill = "📥 수입" if is_import else "📦 수출"
+                                incoterms = "CIF" if is_import else "FOB"
+                                incoterms_desc = "매도인이 목적항까지 비용 부담" if is_import else "매도인이 선적항에서 선박에 적재할 때까지 위험/비용 부담"
+                                pol_desc = "해외 출발항" if is_import else "부산항 (KRBUS)"
+                                pod_desc = "부산항 (KRBUS)" if is_import else "해외 목적항 (예상)"
+                                step1_title = "수입신고 접수" if is_import else "수출신고 접수 (Export Declaration)"
+                                step2_title = "수입신고 수리" if is_import else "수출신고 수리 (Clearance Approved)"
+                                
+                                modal_id = f"myModal_{clean_no}"
+                                
+                                html_content = f"""
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+                                    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+                                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                                    <style>
+                                        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+                                        * {{ box-sizing: border-box; }}
+                                        html, body {{ height: 100%; }}
+                                        body {{ font-family: 'Pretendard', sans-serif; margin: 0; padding: 5px; background-color: transparent; color: #1e293b; overflow-x: hidden; }}
                                         
-                                        <div id="printArea_{clean_no}" style="position:relative; overflow:hidden; padding:20px; background:white;">
-                                            <div class="watermark">SAMPLE COPY</div>
-                                            <div class="content-over-watermark">
-                                                <h2 class="form-title">{doc_title}</h2>
-                                                <table class="declaration-table">
-                                                    <tr>
-                                                        <th>신고번호</th><td>{data['expDclrNo']}</td>
-                                                        <th>신고(수리)일자</th><td>{acpt_dt_formatted[:10]}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <th>수출자 (화주)</th>
-                                                        <td colspan="3"><b>{data['exppnConm']}</b> <span style="color:#666; font-size:11px; margin-left:10px;">(사업자등록번호: 107-87-40814)</span></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <th>B/L 번호</th><td>- (시스템 연동중)</td>
-                                                        <th>인코텀즈(인도조건)</th><td>{incoterms}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <th>적재항 (POL)</th><td>{pol_desc}</td>
-                                                        <th>도착항 (POD)</th><td>{pod_desc}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <th>선기명 / 항차</th><td>{data.get('sanm', '미정')}</td>
-                                                        <th>포장수량</th><td>{data['csclPckUt']}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <th>적재의무기한</th><td>{load_tmlm}</td>
-                                                        <th>선적여부</th><td>{data['shpmCmplYn']}</td>
-                                                    </tr>
-                                                </table>
-                                                
-                                                <!-- DB 연동 예정 품목 테이블 공간 -->
-                                                <h4 style="margin-top:30px; margin-bottom:10px; font-size:14px; border-left:4px solid #3b82f6; padding-left:8px;">[ 품목 상세 내역 ] <span style="font-weight:normal; font-size:11px; color:#ef4444; margin-left:10px;">※ 사내 ERP/DB 연동 시 실데이터 표기 영역 (현재 빈칸 처리됨)</span></h4>
-                                                <table class="items-table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th style="width:5%">#</th>
-                                                            <th style="width:35%">제품명 (품목 및 규격)</th>
-                                                            <th style="width:15%">수량 (단위)</th>
-                                                            <th style="width:15%">단가</th>
-                                                            <th style="width:15%">신고금액</th>
-                                                            <th style="width:15%">관부가세</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>1</td><td class="td-left"></td><td></td><td class="td-money"></td><td class="td-money"></td><td></td>
-                                                        </tr>
-                                                        <tr style="background:#f8fafc;">
-                                                            <td>2</td><td class="td-left"></td><td></td><td class="td-money"></td><td class="td-money"></td><td></td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>3</td><td class="td-left"></td><td></td><td class="td-money"></td><td class="td-money"></td><td></td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td colspan="4" style="text-align:right; font-weight:bold; background:#e2e8f0;">총 합계금액 (Total Amount)</td>
-                                                            <td class="td-money" style="font-weight:bold; background:#e2e8f0; color:#b91c1c;"></td>
-                                                            <td style="background:#e2e8f0;"></td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-
-                                                <div style="margin-top: 20px;">
-                                                    <h4 style="margin-bottom: 5px;">[ 절차 이력 전체 ]</h4>
-                                                    <ul style="font-size: 13px; line-height: 1.6; padding-left: 20px;">
-                                                        <li>[신고] {step1_title} 완료</li>
-                                                        <li>[수리] {acpt_dt_formatted} - {step2_title} 승인</li>
-                                                        <li>[선적] {'기한 내 적재/양하 완료' if is_loaded else f'{load_tmlm} 내 적재/양하 대기'}</li>
-                                                    </ul>
+                                        .card {{ background: white; border-radius: 16px; padding: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 0px; width: 100%; min-height: calc(100vh - 30px); display: flex; flex-direction: column; }}
+                                        .card-title {{ display: flex; align-items: center; font-size: 16px; font-weight: 700; margin-bottom: 16px; color: #0f172a; }}
+                                        .card-title i {{ color: #10b981; margin-right: 10px; font-size: 20px; }}
+                                        .card-title.unipass i {{ color: #d4af37; }}
+                                        
+                                        /* Timeline (Itinerary) */
+                                        .timeline-container {{ position: relative; padding: 10px 0; margin-bottom: 10px; }}
+                                        .timeline-line {{ position: absolute; top: 25px; left: 10%; right: 10%; height: 4px; background: #e2e8f0; z-index: 1; }}
+                                        .timeline-steps {{ display: flex; justify-content: space-between; position: relative; z-index: 2; }}
+                                        .step {{ display: flex; flex-direction: column; align-items: center; width: 33%; }}
+                                        .step-icon {{ width: 32px; height: 32px; border-radius: 50%; background: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-bottom: 12px; border: 4px solid white; box-shadow: 0 0 0 1px #e2e8f0; }}
+                                        .step-icon.delayed {{ background: #ef4444; }}
+                                        .step-title {{ font-weight: 700; font-size: 11px; margin-bottom: 6px; text-align: center; word-break: keep-all; }}
+                                        .step-date {{ background: #d1fae5; color: #047857; padding: 3px 8px; border-radius: 20px; font-size: 10px; border: 1px solid #a7f3d0; text-align: center; word-break: keep-all; }}
+                                        .step-date.delayed {{ background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }}
+                                        
+                                        /* Info Pills */
+                                        .pills-container {{ display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }}
+                                        .pill {{ padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; display: flex; align-items: center; word-break: keep-all; }}
+                                        .pill-green {{ background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; }}
+                                        .pill-yellow {{ background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }}
+                                        .pill-gray {{ background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }}
+                                        .count-badge {{ background: #f1f5f9; border: 1px solid #e2e8f0; padding: 4px 12px; border-radius: 20px; font-size: 13px; margin-left: auto; color: #64748b; font-weight: 600; }}
+                                        
+                                        /* Table */
+                                        table.history-table {{ width: 100%; border-collapse: collapse; }}
+                                        table.history-table th {{ padding: 10px 5px; text-align: left; font-size: 11px; color: #64748b; border-bottom: 2px solid #e2e8f0; font-weight: 600; white-space: nowrap; }}
+                                        table.history-table td {{ padding: 12px 5px; font-size: 12px; color: #334155; vertical-align: middle; border-bottom: 1px solid #f1f5f9; line-height: 1.3; word-break: keep-all; }}
+                                        table.history-table tr.row-blue {{ background-color: #eff6ff; }}
+                                        table.history-table tr.row-green {{ background-color: #f0fdf4; }}
+                                        table.history-table tr.row-red {{ background-color: #fef2f2; }}
+                                        
+                                        .status-complete {{ display: inline-flex; flex-direction: column; align-items: center; background: #d1fae5; color: #047857; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #a7f3d0; font-weight: bold; }}
+                                        .status-pending {{ display: inline-flex; flex-direction: column; align-items: center; background: #fef3c7; color: #d97706; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #fde68a; font-weight: bold; }}
+                                        .status-delayed {{ display: inline-flex; flex-direction: column; align-items: center; background: #fee2e2; color: #b91c1c; padding: 6px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #fecaca; font-weight: bold; }}
+                                        
+                                        /* View Document Badge */
+                                        .badge-view {{
+                                            display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+                                            background: #6366f1; color: white; border-radius: 20px; padding: 8px 16px;
+                                            font-size: 12px; font-weight: bold; cursor: pointer; margin-left: 10px;
+                                            box-shadow: 0 4px 10px rgba(99,102,241,0.3); transition: transform 0.2s;
+                                            vertical-align: middle;
+                                        }}
+                                        .badge-view:hover {{ transform: scale(1.05); }}
+                                        .badge-view i {{ font-size: 16px; margin-bottom: 2px; }}
+                                        
+                                        /* Modal Styles */
+                                        .modal {{ display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }}
+                                        .modal-content {{ background-color: white; margin: 2% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }}
+                                        .close-btn {{ position: absolute; right: 25px; top: 25px; font-size: 24px; cursor: pointer; color: #94a3b8; background: none; border: none; }}
+                                        .close-btn:hover {{ color: #0f172a; }}
+                                        
+                                        /* Form Styles (For PDF) */
+                                        #printArea {{ padding: 20px; background: white; }}
+                                        .form-title {{ text-align: center; text-decoration: underline; letter-spacing: 15px; margin-bottom: 40px; font-size: 28px; color: black; }}
+                                        .declaration-table {{ width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; color: black; margin-bottom: 20px; }}
+                                        .declaration-table th, .declaration-table td {{ border: 1px solid #000; padding: 12px; }}
+                                        .declaration-table th {{ background: #f8f9fa; width: 22%; }}
+                                        
+                                        .items-table {{ width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; color: black; margin-bottom: 20px; border: 1px solid #000; }}
+                                        .items-table th {{ background: #e2e8f0; padding: 10px; border: 1px solid #000; font-weight: bold; }}
+                                        .items-table td {{ padding: 10px; border: 1px solid #000; height: 35px; }}
+                                        .items-table .td-money {{ text-align: right; }}
+                                        .items-table .td-left {{ text-align: left; }}
+                                        
+                                        .btn-group {{ display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; }}
+                                        .btn-pdf {{ background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px; }}
+                                        .btn-print {{ background: #10b981; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px; }}
+                                        
+                                        .footer-text {{ font-size: 12px; color: #94a3b8; margin-top: 16px; margin-left: 8px; }}
+                                        
+                                        .watermark {{ position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 120px; color: rgba(220, 220, 220, 0.3); z-index: 0; pointer-events: none; font-weight: bold; user-select: none; white-space: nowrap; }}
+                                        .content-over-watermark {{ position: relative; z-index: 1; }}
+                                    
+                                        @media (prefers-color-scheme: dark) {{
+                                            body {{ color: #f8fafc; }}
+                                            .card {{ background: #1e293b; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); border: 1px solid #334155; }}
+                                            .card-title {{ color: #f1f5f9; }}
+                                            table.history-table th {{ color: #94a3b8; border-bottom: 2px solid #334155; }}
+                                            table.history-table td {{ color: #cbd5e1; border-bottom: 1px solid #334155; }}
+                                            .timeline-line {{ background: #334155; }}
+                                            .step-icon {{ box-shadow: 0 0 0 1px #334155; border-color: #1e293b; color: #fff; }}
+                                            .step-title {{ color: #e2e8f0; }}
+                                            .step-date {{ background: #064e3b; color: #a7f3d0; border-color: #065f46; }}
+                                            .card-divider {{ border-color: #475569 !important; }}
+                                            .step-date.delayed {{ background: #7f1d1d; color: #fecaca; border-color: #991b1b; }}
+                                            .count-badge {{ background: #334155; border-color: #475569; color: #cbd5e1; }}
+                                            .pill-gray {{ background: #334155; border-color: #475569; color: #cbd5e1; }}
+                                            .pill-yellow {{ background: #422006; border-color: #78350f; color: #fde68a; }}
+                                            .pill-green {{ background: #064e3b; border-color: #065f46; color: #a7f3d0; }}
+                                        }}
+                                    </style>
+                                </head>
+                                <body>
+                                    <!-- Top Card: Itinerary -->
+                                    <div class="card">
+                                        <div class="card-title">
+                                            <i class="fa-solid fa-location-dot"></i> 선박 경유지 현황 (Itinerary)
+                                        </div>
+                                        <div class="timeline-container">
+                                            <div class="timeline-line"></div>
+                                            <div class="timeline-steps">
+                                                <div class="step">
+                                                    <div class="step-icon"><i class="fa-solid fa-check"></i></div>
+                                                    <div class="step-title">{step2_title}</div>
+                                                    <div class="step-date">{acpt_dt_formatted}</div>
                                                 </div>
-                                                <p style="text-align:center; margin-top:50px; font-size:12px; color:#555;">본 증명서는 관세청 통관시스템(UNIPASS) 전자문서와 동일함을 증명합니다.<br>이 문서는 열람 전용이며 공식 증명서로 사용할 수 없습니다.</p>
+                                                <div class="step">
+                                                    <div class="step-icon {'' if is_loaded else 'pending'}"><i class="fa-solid {'fa-check' if is_loaded else 'fa-clock'}"></i></div>
+                                                    <div class="step-title" style="color:{'inherit' if is_loaded else '#64748b'}">{pol_desc}</div>
+                                                    <div class="step-date {'' if is_loaded else 'pending'}">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (출항 예정)"}</div>
+                                                </div>
+                                                <div class="step">
+                                                    <div class="step-icon {'delayed' if is_delayed else 'pending'}"><i class="fa-solid {'fa-triangle-exclamation' if is_delayed else 'fa-ship'}"></i></div>
+                                                    <div class="step-title" style="color:{'#ef4444' if is_delayed else '#64748b'}">{pod_desc}</div>
+                                                    <div class="step-date {'delayed' if is_delayed else 'pending'}">{final_eta_display}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <hr class="card-divider" style="border: 0; border-top: 1px dashed #cbd5e1; margin: 30px 0;" />
+                                        
+                                        <!-- Bottom Section: History -->
+                                        <div style="display:flex; align-items:center; margin-bottom: 24px;">
+                                            <div class="card-title unipass" style="margin-bottom:0;">
+                                                <i class="fa-solid fa-building-columns"></i> 관세청 유니패스 — 절차별 처리현황 [{clean_no}]
+                                            </div>
+                                            <div class="count-badge">총 4건</div>
+                                        </div>
+                                        
+                                        <div class="pills-container">
+                                            <div class="pill pill-green">{doc_type_pill} &nbsp;|&nbsp; 조회유형: {'수입신고번호' if is_import else '수출신고번호'}</div>
+                                            <div class="pill pill-yellow"><b style="color:#d97706;">{incoterms}</b> &nbsp;{incoterms_desc}</div>
+                                            <div class="pill pill-gray">📍 {pol_desc} &nbsp;&rarr;&nbsp; 🏁 {pod_desc}</div>
+                                        </div>
+                                        
+                                        <table class="history-table">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width:5%">#</th>
+                                                    <th style="width:28%">처리 단계</th>
+                                                    <th style="width:28%">처리 일시</th>
+                                                    <th style="width:20%">처리 장소</th>
+                                                    <th style="width:8%">상태</th>
+                                                    <th style="width:11%">비고</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td style="color:#94a3b8;">1</td>
+                                                    <td style="font-weight:600;">{step1_title}</td>
+                                                    <td style="font-family:monospace;">{acpt_dt_formatted}</td>
+                                                    <td style="color:#64748b;">관세사 / 세관 EDI</td>
+                                                    <td><div class="status-complete"><i class="fa-solid fa-check"></i>완료</div></td>
+                                                    <td></td>
+                                                </tr>
+                                                <tr class="row-blue">
+                                                    <td style="color:#94a3b8;">2</td>
+                                                    <td style="font-weight:700; color:#1d4ed8; display:flex; align-items:center;">
+                                                        {step2_title}
+                                                        <div class="badge-view" onclick="openModal()">📋 <span>면장 보기</span></div>
+                                                    </td>
+                                                    <td style="font-family:monospace;">{acpt_dt_formatted}</td>
+                                                    <td style="color:#64748b;">관세청</td>
+                                                    <td><div class="status-complete"><i class="fa-solid fa-check"></i>완료</div></td>
+                                                    <td style="color:#64748b; font-size:12px;">신고번호:<br>{data['expDclrNo']}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="color:#94a3b8;">3</td>
+                                                    <td style="font-weight:600;">{'양하 완료 (Cargo Discharged)' if is_import else '선적 완료 (Cargo Loaded)'}</td>
+                                                    <td style="font-family:monospace;">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (예정)"}</td>
+                                                    <td style="color:#64748b;">{pol_desc} / {data.get('sanm', '미상')}</td>
+                                                    <td>
+                                                        { '<div class="status-complete"><i class="fa-solid fa-check"></i>완료</div>' if is_loaded else '<div class="status-pending"><i class="fa-solid fa-clock"></i>미완료(예상)</div>' }
+                                                    </td>
+                                                    <td></td>
+                                                </tr>
+                                                <tr class="{'row-red' if is_delayed else 'row-green'}">
+                                                    <td style="color:#94a3b8;">4</td>
+                                                    <td style="font-weight:700; color:{'#ef4444' if is_delayed else '#047857'};"><span style="color:{'#ef4444' if is_delayed else '#10b981'}; font-size:18px; margin-right:5px;">●</span>{pod_desc} 도착 예정</td>
+                                                    <td style="font-family:monospace;">{final_eta_display} {eta_warning_html}</td>
+                                                    <td style="color:#64748b;">{pod_desc}</td>
+                                                    <td>{ '<div class="status-delayed"><i class="fa-solid fa-triangle-exclamation"></i>지연</div>' if is_delayed else '<div class="status-pending"><i class="fa-solid fa-clock"></i>미완료(예상)</div>' }</td>
+                                                    <td></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                        <div style="margin-top: auto;"></div>
+                                        <hr class="card-divider" style="border: 0; border-top: 1px dashed #cbd5e1; margin: 20px 0 10px 0;" />
+                                        <div class="footer-text" style="margin-top: 0; padding-top: 0;">※ 출처: 관세청 유니패스(UNI-PASS) 및 VesselFinder 실시간 조회 데이터 · 최종 단계가 현재 처리 상태입니다.</div>
+                                    </div>
+
+                                    <!-- The Modal -->
+                                    <div id="{modal_id}" class="modal" onclick="closeModalOutside(event)">
+                                        <div class="modal-content" onclick="event.stopPropagation()">
+                                            <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                                            <div class="btn-group">
+                                                <button class="btn-pdf" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF 다운로드</button>
+                                                <button class="btn-print" onclick="printForm()"><i class="fa-solid fa-print"></i> 인쇄하기</button>
+                                                <div style="margin-left:auto; display:flex; gap:10px;">
+                                                    <button onclick="alert('💡 관세청 API 보안 정책상 상업송장(Invoice) 스캔 원본 파일은 외부로 제공되지 않습니다. 대신, 화면의 정보는 관세청에 신고된 데이터와 동일함을 보증합니다.')" style="background:#f1f5f9; color:#475569; padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">📄 인보이스(CI) 원본 보기</button>
+                                                    <button onclick="alert('💡 관세청 API 보안 정책상 패킹리스트(P/L) 스캔 원본 파일은 외부로 제공되지 않습니다. 상세 패킹 내역은 하단의 포장수량({data['csclPckUt']}) 정보를 참조해주세요.')" style="background:#f1f5f9; color:#475569; padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">📦 패킹리스트(PL) 원본 보기</button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div id="printArea_{clean_no}" style="position:relative; overflow:hidden; padding:20px; background:white;">
+                                                <div class="watermark">SAMPLE COPY</div>
+                                                <div class="content-over-watermark">
+                                                    <h2 class="form-title">{doc_title}</h2>
+                                                    <table class="declaration-table">
+                                                        <tr>
+                                                            <th>신고번호</th><td>{data['expDclrNo']}</td>
+                                                            <th>신고(수리)일자</th><td>{acpt_dt_formatted[:10]}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>수출자 (화주)</th>
+                                                            <td colspan="3"><b>{data['exppnConm']}</b> <span style="color:#666; font-size:11px; margin-left:10px;">(사업자등록번호: 107-87-40814)</span></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>선기명 / 항차</th><td style="font-weight:bold; color:#1d4ed8;">{data.get('sanm', '미정')}</td>
+                                                            <th>선적국 (Flag)</th><td>{flag}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>선박 IMO/MMSI</th><td>IMO {imo_val} / MMSI {mmsi}</td>
+                                                            <th>호출부호(CallSign)</th><td>{callsign}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>적재항 (POL)</th><td>{pol_desc}</td>
+                                                            <th>도착항 (POD)</th><td>{pod_desc}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>포장수량</th><td>{data['csclPckUt']}</td>
+                                                            <th>선적상태(여부)</th><td>{data['shpmCmplYn']} (기한: {load_tmlm})</td>
+                                                        </tr>
+                                                    </table>
+                                                    
+                                                    <!-- DB 연동 예정 품목 테이블 공간 -->
+                                                    <h4 style="margin-top:30px; margin-bottom:10px; font-size:14px; border-left:4px solid #3b82f6; padding-left:8px;">[ 품목 상세 내역 ] <span style="font-weight:normal; font-size:11px; color:#ef4444; margin-left:10px;">※ 사내 ERP/DB 연동 시 실데이터 표기 영역 (현재 빈칸 처리됨)</span></h4>
+                                                    <table class="items-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th style="width:5%">#</th>
+                                                                <th style="width:35%">제품명 (품목 및 규격)</th>
+                                                                <th style="width:15%">수량 (단위)</th>
+                                                                <th style="width:15%">단가</th>
+                                                                <th style="width:15%">신고금액</th>
+                                                                <th style="width:15%">관부가세</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr>
+                                                                <td>1</td><td class="td-left"></td><td></td><td class="td-money"></td><td class="td-money"></td><td></td>
+                                                            </tr>
+                                                            <tr style="background:#f8fafc;">
+                                                                <td>2</td><td class="td-left"></td><td></td><td class="td-money"></td><td class="td-money"></td><td></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td>3</td><td class="td-left"></td><td></td><td class="td-money"></td><td class="td-money"></td><td></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td colspan="4" style="text-align:right; font-weight:bold; background:#e2e8f0;">총 합계금액 (Total Amount)</td>
+                                                                <td class="td-money" style="font-weight:bold; background:#e2e8f0; color:#b91c1c;"></td>
+                                                                <td style="background:#e2e8f0;"></td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+
+                                                    <div style="margin-top: 20px;">
+                                                        <h4 style="margin-bottom: 5px;">[ 절차 이력 전체 ]</h4>
+                                                        <ul style="font-size: 13px; line-height: 1.6; padding-left: 20px;">
+                                                            <li>[신고] {step1_title} 완료</li>
+                                                            <li>[수리] {acpt_dt_formatted} - {step2_title} 승인</li>
+                                                            <li>[선적] {'기한 내 적재/양하 완료' if is_loaded else f'{load_tmlm} 내 적재/양하 대기'}</li>
+                                                        </ul>
+                                                    </div>
+                                                    <p style="text-align:center; margin-top:50px; font-size:12px; color:#555;">본 증명서는 관세청 통관시스템(UNIPASS) 전자문서와 동일함을 증명합니다.<br>이 문서는 열람 전용이며 공식 증명서로 사용할 수 없습니다.</p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <script>
-                                    function openModal() {{
-                                        document.getElementById('{modal_id}').style.display = "block";
-                                        document.body.style.overflow = "hidden";
-                                    }}
-                                    
-                                    function closeModal() {{
-                                        document.getElementById('{modal_id}').style.display = "none";
-                                        document.body.style.overflow = "auto";
-                                    }}
-                                    
-                                    function closeModalOutside(event) {{
-                                        if (event.target == document.getElementById('{modal_id}')) {{ closeModal(); }}
-                                    }}
-                                    
-                                    function downloadPDF() {{
-                                        const {{ jsPDF }} = window.jspdf;
-                                        const printArea = document.getElementById('printArea_{clean_no}');
+                                    <script>
+                                        function openModal() {{
+                                            document.getElementById('{modal_id}').style.display = "block";
+                                            document.body.style.overflow = "hidden";
+                                        }}
                                         
-                                        const originalBorder = printArea.style.border;
-                                        printArea.style.border = 'none';
+                                        function closeModal() {{
+                                            document.getElementById('{modal_id}').style.display = "none";
+                                            document.body.style.overflow = "auto";
+                                        }}
                                         
-                                        html2canvas(printArea, {{ scale: 2 }}).then(canvas => {{
-                                            const imgData = canvas.toDataURL('image/png');
-                                            const pdf = new jsPDF('p', 'mm', 'a4');
-                                            const pdfWidth = pdf.internal.pageSize.getWidth();
-                                            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                                        function closeModalOutside(event) {{
+                                            if (event.target == document.getElementById('{modal_id}')) {{ closeModal(); }}
+                                        }}
+                                        
+                                        function downloadPDF() {{
+                                            const {{ jsPDF }} = window.jspdf;
+                                            const printArea = document.getElementById('printArea_{clean_no}');
                                             
-                                            pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
-                                            const fileName = "{'수입' if is_import else '수출'}신고필증_{data['expDclrNo']}.pdf";
-                                            pdf.save(fileName);
+                                            const originalBorder = printArea.style.border;
+                                            printArea.style.border = 'none';
                                             
-                                            printArea.style.border = originalBorder;
-                                        }});
-                                    }}
-                                    
-                                    function printForm() {{
-                                        const printContent = document.getElementById('printArea_{clean_no}').innerHTML;
-                                        const originalContent = document.body.innerHTML;
-                                        document.body.innerHTML = printContent;
-                                        window.print();
-                                        document.body.innerHTML = originalContent;
-                                        location.reload();
-                                    }}
-                                </script>
-                            </body>
-                            </html>
-                            """
-                            components.html(html_content, height=1500, scrolling=True)
-                            
-                    except Exception as e:
-                        st.error(f"⚠️ 유니패스 API 통신 오류 ({clean_no}): {e}")
+                                            html2canvas(printArea, {{ scale: 2 }}).then(canvas => {{
+                                                const imgData = canvas.toDataURL('image/png');
+                                                const pdf = new jsPDF('p', 'mm', 'a4');
+                                                const pdfWidth = pdf.internal.pageSize.getWidth();
+                                                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                                                
+                                                pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
+                                                const fileName = "{'수입' if is_import else '수출'}신고필증_{data['expDclrNo']}.pdf";
+                                                pdf.save(fileName);
+                                                
+                                                printArea.style.border = originalBorder;
+                                            }});
+                                        }}
+                                        
+                                        function printForm() {{
+                                            const printContent = document.getElementById('printArea_{clean_no}').innerHTML;
+                                            const originalContent = document.body.innerHTML;
+                                            document.body.innerHTML = printContent;
+                                            window.print();
+                                            document.body.innerHTML = originalContent;
+                                            location.reload();
+                                        }}
+                                    </script>
+                                </body>
+                                </html>
+                                """
+                                components.html(html_content, height=1170, scrolling=False)
+                                
+                        except Exception as e:
+                            st.error(f"⚠️ 유니패스 API 통신 오류 ({clean_no}): {e}")
 
 
 
-        st.markdown("---")
-
-        # --- 2. 선박 조회 섹션 ---
-        st.subheader("🚢 실시간 선박 위치 및 기상 조회")
-        
-        if st.session_state.vessel_history:
-            st.markdown("⭐️ **관심 선박 목록 (클릭 시 1초 전환 토글)**")
-            hist_cols = st.columns(len(st.session_state.vessel_history) + 1)
-            for i, hist in enumerate(st.session_state.vessel_history):
-                btn_type = "primary" if hist == st.session_state.vessel_input_widget else "secondary"
-                hist_cols[i].button(f"🛳️ {hist}", key=f"hist_{hist}", on_click=set_vessel, args=(hist,), type=btn_type, use_container_width=True)
-            st.markdown("<br>", unsafe_allow_html=True)
+        # --- 2. 선박 조회 섹션 --- (이제 우측 컬럼)
+        with main_col2:
+            st.subheader("🚢 실시간 선박 위치 및 기상 조회")
             
-        col_s1, col_s2 = st.columns([3, 1])
-        with col_s1:
-            search_vessel = st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", key="vessel_input_widget", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
-        
-        if search_vessel:
-            search_vessel = search_vessel.strip()
-            if search_vessel not in st.session_state.vessel_history:
-                st.session_state.vessel_history.insert(0, search_vessel)
-                if len(st.session_state.vessel_history) > 6:
-                    st.session_state.vessel_history = st.session_state.vessel_history[:6]
-                st.rerun() # Refresh to show new button
-        
-        mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
-        if search_vessel:
-            if len(search_vessel) == 9 and search_vessel.isdigit():
-                mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
-            elif len(search_vessel) >= 7 and search_vessel.isdigit():
-                mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
+            if st.session_state.vessel_history:
+                st.markdown("⭐️ **관심 선박 목록 (클릭 시 1초 전환 토글)**")
+                hist_cols = st.columns(len(st.session_state.vessel_history) + 1)
+                for i, hist in enumerate(st.session_state.vessel_history):
+                    btn_type = "primary" if hist == st.session_state.vessel_input_widget else "secondary"
+                    hist_cols[i].button(f"🛳️ {hist}", key=f"hist_{hist}", on_click=set_vessel, args=(hist,), type=btn_type, use_container_width=True)
+                st.markdown("<br>", unsafe_allow_html=True)
                 
-        vesselfinder_html = f"""
-        <div style="margin-bottom: 20px;">
-            <div style="width: 100%; height: 500px;">
-                <script type="text/javascript">
-                    var width="100%";
-                    var height="500";
-                    var names=true;
-                    {mmsi_script}
-                </script>
-                <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+            col_s1, col_s2 = st.columns([3, 1])
+            with col_s1:
+                search_vessel = st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", key="vessel_input_widget", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
+            
+            if search_vessel:
+                search_vessel = search_vessel.strip()
+                if search_vessel not in st.session_state.vessel_history:
+                    st.session_state.vessel_history.insert(0, search_vessel)
+                    if len(st.session_state.vessel_history) > 6:
+                        st.session_state.vessel_history = st.session_state.vessel_history[:6]
+                    st.rerun() # Refresh to show new button
+            
+            mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
+            if search_vessel:
+                if len(search_vessel) == 9 and search_vessel.isdigit():
+                    mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
+                elif len(search_vessel) >= 7 and search_vessel.isdigit():
+                    mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
+                    
+            vesselfinder_html = f"""
+            <div>
+                <div style="width: 100%; height: 450px;">
+                    <script type="text/javascript">
+                        var width="100%";
+                        var height="450";
+                        var names=true;
+                        {mmsi_script}
+                    </script>
+                    <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+                </div>
             </div>
-        </div>
-        """
-        
-        windy_html = """
-        <div>
-            <h4 style="font-family: sans-serif; margin-bottom: 10px;">🌊 바다 날씨 및 풍랑 예측 (Windy)</h4>
-            <iframe 
-                width="100%" 
-                height="400" 
-                src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=kt&zoom=4&overlay=waves&product=ecmwf&level=surface&lat=35.0&lon=129.0" 
-                frameborder="0">
-            </iframe>
-        </div>
-        """
-        
-        components.html(vesselfinder_html + windy_html, height=950, scrolling=True)
+            """
+            
+            windy_html = """
+            <div>
+                                <iframe 
+                    width="100%" 
+                    height="350" 
+                    src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=kt&zoom=4&overlay=waves&product=ecmwf&level=surface&lat=35.0&lon=129.0" 
+                    frameborder="0">
+                </iframe>
+            </div>
+            """
+            
+            components.html(vesselfinder_html, height=450, scrolling=False)
+            st.markdown("#### 🌊 바다 날씨 및 풍랑 예측 (Windy)")
+            components.html(windy_html, height=350, scrolling=False)
 
 with tab5:
     st.header("🇺🇸 미국 이차전지 부품 수출 관세율 변동 추이")
