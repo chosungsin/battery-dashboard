@@ -617,7 +617,7 @@ with tab3:
         st.session_state.vessel_input_widget = v
         # 우측 선박 선택 시 좌측 유니패스 연동
         imo_to_dclr = {
-            "9839430": "4177426003929X", # MSC GULSUN
+            "9955284": "4177426003929X", # HMM TOPAZ
             "9863297": "1234567890123M", # HMM ALGECIRAS
             "9863302": "4177426003706X"  # HMM COPENHAGEN
         }
@@ -637,7 +637,7 @@ with tab3:
                 if len(st.session_state.vessel_history) > 6:
                     st.session_state.vessel_history = st.session_state.vessel_history[:6]
             imo_to_dclr = {
-                "9839430": "4177426003929X",
+                "9955284": "4177426003929X", # HMM TOPAZ
                 "9863297": "1234567890123M",
                 "9863302": "4177426003706X"
             }
@@ -784,7 +784,7 @@ with tab3:
                                 
                                 # 미선적 상태라 선박명이 없더라도, 신고서상 배정된 선박을 파싱했다고 가정 (데모 연동)
                                 if not sanm:
-                                    if clean_no == "4177426003929X": sanm = "MSC GULSUN"
+                                    if clean_no.endswith("929X"): sanm = "HMM TOPAZ"
                                     elif clean_no == "1234567890123M": sanm = "HMM ALGECIRAS"
                                     else: sanm = "HMM COPENHAGEN"
                                     data['sanm'] = sanm
