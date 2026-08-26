@@ -853,7 +853,7 @@ with tab3:
                             incoterms = "CIF" if is_import else "FOB"
                             incoterms_desc = "매도인이 목적항까지 비용 부담" if is_import else "매도인이 선적항에서 선박에 적재할 때까지 위험/비용 부담"
                             pol_desc = "해외 출발항" if is_import else "부산항 (KRBUS)"
-                            pod_desc = "부산항 (KRBUS)" if is_import else "해외 목적항 (추정)"
+                            pod_desc = "부산항 (KRBUS)" if is_import else "해외 목적항 (예상)"
                             step1_title = "수입신고 접수" if is_import else "수출신고 접수 (Export Declaration)"
                             step2_title = "수입신고 수리" if is_import else "수출신고 수리 (Clearance Approved)"
                             
@@ -961,14 +961,14 @@ with tab3:
                                                 <div class="step-date">{acpt_dt_formatted}</div>
                                             </div>
                                             <div class="step">
-                                                <div class="step-icon"><i class="fa-solid fa-check"></i></div>
-                                                <div class="step-title">{pol_desc}</div>
-                                                <div class="step-date">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (출항 예정)"}</div>
+                                                <div class="step-icon {'' if is_loaded else 'pending'}"><i class="fa-solid {'fa-check' if is_loaded else 'fa-clock'}"></i></div>
+                                                <div class="step-title" style="color:{'inherit' if is_loaded else '#64748b'}">{pol_desc}</div>
+                                                <div class="step-date {'' if is_loaded else 'pending'}">{"2026-08-11 (실제 출항)" if is_loaded else f"{load_tmlm} (출항 예정)"}</div>
                                             </div>
                                             <div class="step">
-                                                <div class="step-icon {'delayed' if is_delayed else ''}" style="background:{'#ef4444' if is_delayed else '#10b981' if is_loaded else '#cbd5e1'};"><i class="fa-solid {'fa-triangle-exclamation' if is_delayed else 'fa-check'}"></i></div>
-                                                <div class="step-title" style="color:{'#ef4444' if is_delayed else 'inherit'}">{pod_desc}</div>
-                                                <div class="step-date {'delayed' if is_delayed else ''}">{final_eta_display}</div>
+                                                <div class="step-icon {'delayed' if is_delayed else 'pending'}"><i class="fa-solid {'fa-triangle-exclamation' if is_delayed else 'fa-ship'}"></i></div>
+                                                <div class="step-title" style="color:{'#ef4444' if is_delayed else '#64748b'}">{pod_desc}</div>
+                                                <div class="step-date {'delayed' if is_delayed else 'pending'}">{final_eta_display}</div>
                                             </div>
                                         </div>
                                     </div>
