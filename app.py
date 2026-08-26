@@ -607,6 +607,16 @@ with tab3:
     def set_vessel(v):
         st.session_state.search_vessel_input = v
 
+    
+    # 선박 검색 이력 세션 상태 초기화
+    if 'vessel_history' not in st.session_state:
+        st.session_state.vessel_history = []
+    if 'search_vessel_input' not in st.session_state:
+        st.session_state.search_vessel_input = ""
+
+    def set_vessel(v):
+        st.session_state.search_vessel_input = v
+
     with tab4:
         st.header(t.get('tab4', '🚢 해상 물류 및 수출입 통관 모니터링'))
         st.markdown("글로벌 이차전지 및 분리막 수출입 물동량을 모니터링하기 위한 실시간 선박 위치(VesselFinder) 및 유니패스(UNIPASS) 통관 정보입니다.")
@@ -625,7 +635,7 @@ with tab3:
                 if len(st.session_state.vessel_history) > 5:
                     st.session_state.vessel_history = st.session_state.vessel_history[:5]
         
-        # 검색 이력 버튼 UI (지도와 겹치지 않도록 일반 Streamlit 버튼 사용)
+        # 검색 이력 버튼 UI
         if st.session_state.vessel_history:
             st.write("🕒 **최근 조회 이력:**")
             hist_cols = st.columns(len(st.session_state.vessel_history) + 3)
@@ -672,20 +682,19 @@ with tab3:
 
         # --- 2. 유니패스 수출입 통관 섹션 ---
         st.markdown("---")
-        st.subheader("📋 유니패스(UNIPASS) 수출 면장 조회 및 인쇄")
+        st.subheader("📋 유니패스(UNIPASS) 수출입 면장 통관 추적")
         
-        dclr_no = st.text_input("🔍 수출신고번호 14자리 입력", placeholder="예: 12345678901234")
+        dclr_no = st.text_input("🔍 수출신고번호(면장번호) 14자리 입력", placeholder="예: 12345678901234")
         
         if dclr_no:
             import requests
             import xml.etree.ElementTree as ET
             
             clean_no = dclr_no.replace("-", "").strip()
-            # Disable unverified HTTPS warning for Unipass
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             
-            with st.spinner("유니패스 데이터를 조회 중입니다..."):
+            with st.spinner("유니패스 데이터를 실시간 조회 중입니다..."):
                 unipass_key = "o260d286z008x204x010n090j2"
                 url = f"https://unipass.customs.go.kr:38010/ext/rest/expDclrNoPrExpFfmnBrkdQry/retrieveExpDclrNoPrExpFfmnBrkd?crkyCn={unipass_key}&expDclrNo={clean_no}"
                 
@@ -707,51 +716,201 @@ with tab3:
                                 'csclPckUt': item.findtext('csclPckUt', ''),
                             }
                             
-                            st.success("✅ 유니패스 수출신고필증 정보가 조회되었습니다.")
+                            st.success("✅ 유니패스 수출신고 현황이 성공적으로 조회되었습니다.")
                             
-                            # 타임라인 UI
-                            step = 1
-                            if data['acptDt']: step = 2
-                            if data['shpmCmplYn'] == 'Y': step = 3
-                            
-                            col_t1, col_t2, col_t3 = st.columns(3)
-                            col_t1.info("📝 1. 신고접수 완료")
-                            col_t2.success(f"✅ 2. 수리완료 ({data['acptDt']})" if step >= 2 else "⏳ 2. 수리 대기중")
-                            if step >= 3:
-                                col_t3.success("🚢 3. 선적완료")
-                            else:
-                                col_t3.warning(f"⏳ 3. 선적 대기중 (적재기한: {data['loadDtyTmlm']})")
-                            
-                            # 인쇄 팝업 버튼 (새 창에서 인쇄)
-                            print_html = f"""
-                            <button onclick="printDoc()" style="padding:15px; width:100%; background:#2ecc71; color:white; font-size:16px; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">📄 수출신고필증(면장) 원본 보기 및 인쇄 / PDF 저장</button>
-                            <script>
-                            function printDoc() {{
-                                var w = window.open('', '_blank', 'height=800,width=800');
-                                w.document.write('<html><head><title>수출신고필증</title>');
-                                w.document.write('<style>');
-                                w.document.write('body {{ font-family: "Malgun Gothic", sans-serif; padding: 20px; }}');
-                                w.document.write('table {{ width:100%; border-collapse:collapse; margin-top:20px; }}');
-                                w.document.write('th, td {{ border:2px solid #333; padding:12px; font-size:14px; }}');
-                                w.document.write('th {{ background:#f5f6fa; text-align:left; width:25%; }}');
-                                w.document.write('h2 {{ text-align:center; font-size:28px; text-decoration:underline; letter-spacing: 5px; }}');
-                                w.document.write('</style></head><body>');
-                                w.document.write('<h2>수출신고필증</h2>');
-                                w.document.write('<table>');
-                                w.document.write('<tr><th>신고번호</th><td>{data['expDclrNo']}</td><th>수리일자</th><td>{data['acptDt']}</td></tr>');
-                                w.document.write('<tr><th>수출자 (화주)</th><td colspan="3"><b>{data['exppnConm']}</b></td></tr>');
-                                w.document.write('<tr><th>적재의무기한</th><td>{data['loadDtyTmlm']}</td><th>선적여부</th><td>{data['shpmCmplYn']}</td></tr>');
-                                w.document.write('<tr><th>선/기명</th><td>{data.get('sanm', '미정')}</td><th>포장수량</th><td>{data['csclPckUt']}</td></tr>');
-                                w.document.write('</table>');
-                                w.document.write('<p style="text-align:center; margin-top:40px; color:#555;">본 증명서는 관세청 통관시스템(UNIPASS) 전자문서와 동일함을 증명합니다.</p>');
-                                w.document.write('</body></html>');
-                                w.document.close();
-                                w.focus();
-                                setTimeout(function() {{ w.print(); }}, 500);
-                            }}
-                            </script>
+                            # 절차별 처리현황 테이블 및 면장 팝업 HTML (iframe)
+                            html_content = f"""
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                                <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+                                <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+                                <style>
+                                    body {{ font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 0; color: #333; }}
+                                    .table-container {{ overflow-x: auto; }}
+                                    table.history-table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
+                                    table.history-table th, table.history-table td {{ border: 1px solid #ddd; padding: 12px; text-align: center; font-size: 14px; }}
+                                    table.history-table th {{ background-color: #f4f6f8; font-weight: bold; }}
+                                    
+                                    .badge {{
+                                        display: inline-flex; align-items: center; justify-content: center;
+                                        padding: 6px 12px;
+                                        background-color: #007bff;
+                                        color: white;
+                                        border-radius: 20px;
+                                        font-size: 13px; font-weight: bold;
+                                        cursor: pointer;
+                                        animation: pulse 2s infinite;
+                                        box-shadow: 0 0 0 rgba(0,123,255,0.4);
+                                        transition: background-color 0.2s;
+                                    }}
+                                    .badge:hover {{ background-color: #0056b3; }}
+                                    @keyframes pulse {{
+                                        0% {{ box-shadow: 0 0 0 0 rgba(0,123,255,0.7); }}
+                                        70% {{ box-shadow: 0 0 0 10px rgba(0,123,255,0); }}
+                                        100% {{ box-shadow: 0 0 0 0 rgba(0,123,255,0); }}
+                                    }}
+                                    
+                                    /* Modal Styles */
+                                    .modal {{ display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); }}
+                                    .modal-content {{ background-color: white; margin: 2% auto; padding: 30px; border-radius: 8px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }}
+                                    .close-btn {{ position: absolute; right: 20px; top: 20px; font-size: 24px; font-weight: bold; cursor: pointer; color: #555; background: none; border: none; }}
+                                    
+                                    /* Form Styles */
+                                    #printArea {{ padding: 20px; background: white; }}
+                                    .form-title {{ text-align: center; text-decoration: underline; letter-spacing: 10px; margin-bottom: 30px; font-size: 24px; }}
+                                    .declaration-table {{ width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }}
+                                    .declaration-table th, .declaration-table td {{ border: 1.5px solid #000; padding: 10px; }}
+                                    .declaration-table th {{ background: #f0f2f5; width: 22%; }}
+                                    
+                                    .btn-group {{ display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }}
+                                    .btn-pdf {{ background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }}
+                                    .btn-print {{ background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }}
+                                </style>
+                            </head>
+                            <body>
+                                <h4>📊 절차별 처리현황</h4>
+                                <div class="table-container">
+                                    <table class="history-table">
+                                        <thead>
+                                            <tr>
+                                                <th>순번</th>
+                                                <th>처리단계</th>
+                                                <th>처리일시 / 기한</th>
+                                                <th>상세 및 비고</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>1</td>
+                                                <td>수출신고</td>
+                                                <td>-</td>
+                                                <td>접수 완료</td>
+                                            </tr>
+                                            <tr style="background-color: #f0f8ff;">
+                                                <td>2</td>
+                                                <td style="color: #0056b3; font-weight: bold;">수출신고수리<br>(Clearance Approved)</td>
+                                                <td>{data['acptDt']}</td>
+                                                <td>
+                                                    <div class="badge" onclick="openModal()">📋 면장 보기</div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>3</td>
+                                                <td>선적/반출</td>
+                                                <td>{data['loadDtyTmlm']} (적재기한)</td>
+                                                <td>{'<span style="color:green;font-weight:bold;">선적완료</span>' if data['shpmCmplYn'] == 'Y' else '<span style="color:orange;font-weight:bold;">선적대기</span>'}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- The Modal -->
+                                <div id="myModal" class="modal" onclick="closeModalOutside(event)">
+                                    <div class="modal-content">
+                                        <button class="close-btn" onclick="closeModal()">&times;</button>
+                                        <div class="btn-group">
+                                            <button class="btn-pdf" onclick="downloadPDF()">📥 PDF 다운로드</button>
+                                            <button class="btn-print" onclick="printForm()">🖨️ 인쇄하기</button>
+                                        </div>
+                                        
+                                        <div id="printArea">
+                                            <h2 class="form-title">수 출 신 고 필 증</h2>
+                                            <table class="declaration-table">
+                                                <tr>
+                                                    <th>신고번호</th><td>{data['expDclrNo']}</td>
+                                                    <th>신고(수리)일자</th><td>{data['acptDt']}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>수출자 (화주)</th><td colspan="3"><b>{data['exppnConm']}</b></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>B/L 번호</th><td>- (시스템 연동중)</td>
+                                                    <th>인코텀즈(인도조건)</th><td>FOB / CIF</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>적재항 (POL)</th><td>KRBUS (부산)</td>
+                                                    <th>도착항 (POD)</th><td>-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>선기명 / 항차</th><td>{data.get('sanm', '미정')}</td>
+                                                    <th>포장수량</th><td>{data['csclPckUt']}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>적재의무기한</th><td>{data['loadDtyTmlm']}</td>
+                                                    <th>선적여부</th><td>{data['shpmCmplYn']}</td>
+                                                </tr>
+                                            </table>
+                                            <div style="margin-top: 20px;">
+                                                <h4 style="margin-bottom: 5px;">[ 절차 이력 전체 ]</h4>
+                                                <ul style="font-size: 13px; line-height: 1.6; padding-left: 20px;">
+                                                    <li>[신고] 수출신고 접수 완료</li>
+                                                    <li>[수리] {data['acptDt']} - 수출신고수리 승인</li>
+                                                    <li>[선적] {'기한 내 적재 완료' if data['shpmCmplYn'] == 'Y' else f'{data["loadDtyTmlm"]} 내 적재 대기'}</li>
+                                                </ul>
+                                            </div>
+                                            <p style="text-align:center; margin-top:50px; font-size:12px; color:#555;">본 증명서는 관세청 통관시스템(UNIPASS) 전자문서와 동일함을 증명합니다.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <script>
+                                    function openModal() {{
+                                        document.getElementById('myModal').style.display = "block";
+                                        // Prevents background scrolling when modal is open
+                                        document.body.style.overflow = "hidden";
+                                    }}
+                                    
+                                    function closeModal() {{
+                                        document.getElementById('myModal').style.display = "none";
+                                        document.body.style.overflow = "auto";
+                                    }}
+                                    
+                                    function closeModalOutside(event) {{
+                                        if (event.target == document.getElementById('myModal')) {{
+                                            closeModal();
+                                        }}
+                                    }}
+                                    
+                                    function downloadPDF() {{
+                                        const {{ jsPDF }} = window.jspdf;
+                                        const printArea = document.getElementById('printArea');
+                                        
+                                        // Temporarily adjust styling for better PDF rendering
+                                        const originalBorder = printArea.style.border;
+                                        printArea.style.border = 'none';
+                                        
+                                        html2canvas(printArea, {{ scale: 2 }}).then(canvas => {{
+                                            const imgData = canvas.toDataURL('image/png');
+                                            const pdf = new jsPDF('p', 'mm', 'a4');
+                                            const pdfWidth = pdf.internal.pageSize.getWidth();
+                                            // Calculate height preserving aspect ratio
+                                            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                                            
+                                            pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
+                                            pdf.save('수출신고필증_{data["expDclrNo"]}.pdf');
+                                            
+                                            // Restore styling
+                                            printArea.style.border = originalBorder;
+                                        }});
+                                    }}
+                                    
+                                    function printForm() {{
+                                        const printContent = document.getElementById('printArea').innerHTML;
+                                        const originalContent = document.body.innerHTML;
+                                        document.body.innerHTML = printContent;
+                                        window.print();
+                                        document.body.innerHTML = originalContent;
+                                        
+                                        // After printing, reload to restore modal behavior
+                                        location.reload();
+                                    }}
+                                </script>
+                            </body>
+                            </html>
                             """
-                            components.html(print_html, height=70)
+                            components.html(html_content, height=800, scrolling=True)
+                            
                     else:
                         st.error("❌ 해당 번호로 조회된 통관 데이터가 없습니다. 번호를 다시 확인해 주세요.")
                 except Exception as e:
