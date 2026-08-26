@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import requests
 import plotly.graph_objects as go
@@ -1200,7 +1201,6 @@ with tab3:
         </div>
         """
         
-        import streamlit.components.v1 as components
         components.html(vesselfinder_html + windy_html, height=950, scrolling=True)
 
 with tab5:
