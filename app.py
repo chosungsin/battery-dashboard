@@ -637,28 +637,42 @@ with tab3:
     def set_vessel(v):
         st.session_state.search_vessel_input = v
 
+    
+    # 선박 검색 이력 세션 상태 초기화
+    if 'vessel_history' not in st.session_state:
+        st.session_state.vessel_history = []
+    if 'search_vessel_input' not in st.session_state:
+        st.session_state.search_vessel_input = ""
+
+    def set_vessel(v):
+        st.session_state.search_vessel_input = v
+
     with tab4:
         st.header(t.get('tab4', '🚢 해상 물류 및 수출입 통관 모니터링'))
         
         # --- 1. 선박 조회 섹션 ---
         st.subheader("🚢 실시간 선박 위치 및 기상 조회")
         
+        if st.session_state.vessel_history:
+            st.markdown("⭐️ **관심 선박 목록 (클릭 시 1초 전환 토글)**")
+            hist_cols = st.columns(len(st.session_state.vessel_history) + 1)
+            for i, hist in enumerate(st.session_state.vessel_history):
+                # Use primary color if it's currently selected
+                btn_type = "primary" if hist == st.session_state.search_vessel_input else "secondary"
+                hist_cols[i].button(f"🛳️ {hist}", key=f"hist_{hist}", on_click=set_vessel, args=(hist,), type=btn_type, use_container_width=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
         col_s1, col_s2 = st.columns([3, 1])
         with col_s1:
-            search_vessel = st.text_input("🔍 선박 고유번호 (IMO/MMSI)", value=st.session_state.search_vessel_input, placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
+            search_vessel = st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", value=st.session_state.search_vessel_input, placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)")
         
         if search_vessel:
             search_vessel = search_vessel.strip()
             if search_vessel not in st.session_state.vessel_history:
                 st.session_state.vessel_history.insert(0, search_vessel)
-                if len(st.session_state.vessel_history) > 5:
-                    st.session_state.vessel_history = st.session_state.vessel_history[:5]
-        
-        if st.session_state.vessel_history:
-            st.write("🕒 **최근 조회 이력:**")
-            hist_cols = st.columns(len(st.session_state.vessel_history) + 3)
-            for i, hist in enumerate(st.session_state.vessel_history):
-                hist_cols[i].button(hist, key=f"hist_{hist}", on_click=set_vessel, args=(hist,))
+                if len(st.session_state.vessel_history) > 6:
+                    st.session_state.vessel_history = st.session_state.vessel_history[:6]
+                st.rerun() # Refresh to show new button
         
         mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
         if search_vessel:
@@ -854,22 +868,31 @@ with tab3:
                                     
                                     /* Modal Styles */
                                     .modal {{ display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }}
-                                    .modal-content {{ background-color: white; margin: 2% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }}
+                                    .modal-content {{ background-color: white; margin: 2% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }}
                                     .close-btn {{ position: absolute; right: 25px; top: 25px; font-size: 24px; cursor: pointer; color: #94a3b8; background: none; border: none; }}
                                     .close-btn:hover {{ color: #0f172a; }}
                                     
                                     /* Form Styles (For PDF) */
                                     #printArea {{ padding: 20px; background: white; }}
                                     .form-title {{ text-align: center; text-decoration: underline; letter-spacing: 15px; margin-bottom: 40px; font-size: 28px; color: black; }}
-                                    .declaration-table {{ width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; color: black; }}
+                                    .declaration-table {{ width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; color: black; margin-bottom: 20px; }}
                                     .declaration-table th, .declaration-table td {{ border: 1px solid #000; padding: 12px; }}
                                     .declaration-table th {{ background: #f8f9fa; width: 22%; }}
+                                    
+                                    .items-table {{ width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; color: black; margin-bottom: 20px; border: 1px solid #000; }}
+                                    .items-table th {{ background: #e2e8f0; padding: 10px; border: 1px solid #000; font-weight: bold; }}
+                                    .items-table td {{ padding: 10px; border: 1px solid #000; }}
+                                    .items-table .td-money {{ text-align: right; }}
+                                    .items-table .td-left {{ text-align: left; }}
                                     
                                     .btn-group {{ display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; }}
                                     .btn-pdf {{ background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px; }}
                                     .btn-print {{ background: #10b981; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px; }}
                                     
                                     .footer-text {{ font-size: 12px; color: #94a3b8; margin-top: 16px; margin-left: 8px; }}
+                                    
+                                    .watermark {{ position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 120px; color: rgba(220, 220, 220, 0.3); z-index: 0; pointer-events: none; font-weight: bold; user-select: none; white-space: nowrap; }}
+                                    .content-over-watermark {{ position: relative; z-index: 1; }}
                                 </style>
                             </head>
                             <body>
@@ -982,42 +1005,85 @@ with tab3:
                                             </div>
                                         </div>
                                         
-                                        <div id="printArea">
-                                            <h2 class="form-title">수 출 신 고 필 증</h2>
-                                            <table class="declaration-table">
-                                                <tr>
-                                                    <th>신고번호</th><td>{data['expDclrNo']}</td>
-                                                    <th>신고(수리)일자</th><td>{acpt_dt_formatted[:10]}</td>
-                                                </tr>
-                                                <tr>
-                                                    <th>수출자 (화주)</th><td colspan="3"><b>{data['exppnConm']}</b></td>
-                                                </tr>
-                                                <tr>
-                                                    <th>B/L 번호</th><td>- (시스템 연동중)</td>
-                                                    <th>인코텀즈(인도조건)</th><td>FOB</td>
-                                                </tr>
-                                                <tr>
-                                                    <th>적재항 (POL)</th><td>KRBUS (부산)</td>
-                                                    <th>도착항 (POD)</th><td>-</td>
-                                                </tr>
-                                                <tr>
-                                                    <th>선기명 / 항차</th><td>{data.get('sanm', '미정')}</td>
-                                                    <th>포장수량</th><td>{data['csclPckUt']}</td>
-                                                </tr>
-                                                <tr>
-                                                    <th>적재의무기한</th><td>{load_tmlm}</td>
-                                                    <th>선적여부</th><td>{data['shpmCmplYn']}</td>
-                                                </tr>
-                                            </table>
-                                            <div style="margin-top: 20px;">
-                                                <h4 style="margin-bottom: 5px;">[ 절차 이력 전체 ]</h4>
-                                                <ul style="font-size: 13px; line-height: 1.6; padding-left: 20px;">
-                                                    <li>[신고] 수출신고 접수 완료</li>
-                                                    <li>[수리] {acpt_dt_formatted} - 수출신고수리 승인</li>
-                                                    <li>[선적] {'기한 내 적재 완료' if is_loaded else f'{load_tmlm} 내 적재 대기'}</li>
-                                                </ul>
+                                        <div id="printArea" style="position:relative; overflow:hidden;">
+                                            <div class="watermark">SAMPLE COPY</div>
+                                            <div class="content-over-watermark">
+                                                <h2 class="form-title">수 출 신 고 필 증</h2>
+                                                <table class="declaration-table">
+                                                    <tr>
+                                                        <th>신고번호</th><td>{data['expDclrNo']}</td>
+                                                        <th>신고(수리)일자</th><td>{acpt_dt_formatted[:10]}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>수출자 (화주)</th>
+                                                        <td colspan="3"><b>{data['exppnConm']}</b> <span style="color:#666; font-size:11px; margin-left:10px;">(사업자등록번호: 107-87-40814)</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>B/L 번호</th><td>- (시스템 연동중)</td>
+                                                        <th>인코텀즈(인도조건)</th><td>FOB</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>적재항 (POL)</th><td>KRBUS (부산)</td>
+                                                        <th>도착항 (POD)</th><td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>선기명 / 항차</th><td>{data.get('sanm', '미정')}</td>
+                                                        <th>포장수량</th><td>{data['csclPckUt']}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>적재의무기한</th><td>{load_tmlm}</td>
+                                                        <th>선적여부</th><td>{data['shpmCmplYn']}</td>
+                                                    </tr>
+                                                </table>
+                                                
+                                                <!-- DB 연동 예정 품목 테이블 공간 -->
+                                                <h4 style="margin-top:30px; margin-bottom:10px; font-size:14px; border-left:4px solid #3b82f6; padding-left:8px;">[ 품목 상세 내역 ] <span style="font-weight:normal; font-size:11px; color:#ef4444; margin-left:10px;">※ 사내 ERP/DB 연동 시 실데이터 표기 영역 (현재는 예시 데이터입니다)</span></h4>
+                                                <table class="items-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width:5%">#</th>
+                                                            <th style="width:35%">제품명 (품목 및 규격)</th>
+                                                            <th style="width:15%">수량 (단위)</th>
+                                                            <th style="width:15%">단가</th>
+                                                            <th style="width:15%">신고금액</th>
+                                                            <th style="width:15%">관부가세</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td>1</td>
+                                                            <td class="td-left"><b>이차전지 부품 (NCM 양극재 811)</b><br><span style="color:#666; font-size:11px;">HS Code: 8507.90-9000</span></td>
+                                                            <td>100 BOX</td>
+                                                            <td class="td-money">$1,200.00</td>
+                                                            <td class="td-money">$120,000.00</td>
+                                                            <td>면제 (0%)</td>
+                                                        </tr>
+                                                        <tr style="background:#f8fafc;">
+                                                            <td>2</td>
+                                                            <td class="td-left"><b>이차전지 부품 (배터리 팩 알루미늄 케이스)</b><br><span style="color:#666; font-size:11px;">HS Code: 8507.90-1000</span></td>
+                                                            <td>50 PLT</td>
+                                                            <td class="td-money">$500.00</td>
+                                                            <td class="td-money">$25,000.00</td>
+                                                            <td>면제 (0%)</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td colspan="4" style="text-align:right; font-weight:bold; background:#e2e8f0;">총 합계금액 (Total Amount)</td>
+                                                            <td class="td-money" style="font-weight:bold; background:#e2e8f0; color:#b91c1c;">$145,000.00</td>
+                                                            <td style="background:#e2e8f0;"></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+
+                                                <div style="margin-top: 20px;">
+                                                    <h4 style="margin-bottom: 5px;">[ 절차 이력 전체 ]</h4>
+                                                    <ul style="font-size: 13px; line-height: 1.6; padding-left: 20px;">
+                                                        <li>[신고] 수출신고 접수 완료</li>
+                                                        <li>[수리] {acpt_dt_formatted} - 수출신고수리 승인</li>
+                                                        <li>[선적] {'기한 내 적재 완료' if is_loaded else f'{load_tmlm} 내 적재 대기'}</li>
+                                                    </ul>
+                                                </div>
+                                                <p style="text-align:center; margin-top:50px; font-size:12px; color:#555;">본 증명서는 관세청 통관시스템(UNIPASS) 전자문서와 동일함을 증명합니다.<br>이 문서는 열람 전용이며 공식 증명서로 사용할 수 없습니다.</p>
                                             </div>
-                                            <p style="text-align:center; margin-top:50px; font-size:12px; color:#555;">본 증명서는 관세청 통관시스템(UNIPASS) 전자문서와 동일함을 증명합니다.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1069,7 +1135,7 @@ with tab3:
                             </body>
                             </html>
                             """
-                            components.html(html_content, height=1300, scrolling=True)
+                            components.html(html_content, height=1500, scrolling=True)
                             
                     else:
                         st.error("❌ 해당 번호로 조회된 통관 데이터가 없습니다. 번호를 다시 확인해 주세요.")
