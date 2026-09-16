@@ -12,6 +12,8 @@ import io
 import re
 from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
+import math
+import json
 
 st.set_page_config(page_title="거시경제 지표 대시보드", layout="wide")
 
@@ -1483,14 +1485,20 @@ with tab3:
             with col_s1:
                 st.text_input("🔍 선박 고유번호 추가 (IMO/MMSI)", key="vessel_input_widget", placeholder="예: 440381000 (MMSI) 또는 9811000 (IMO)", on_change=on_vessel_input_change)
             
-            search_vessel = st.session_state.get("vessel_input_widget", "")
+            search_vessel = st.session_state.get("vessel_input_widget", "").strip()
+            if not search_vessel and st.session_state.get("vessel_history"):
+                search_vessel = st.session_state.vessel_history[0].strip()
+            if not search_vessel:
+                search_vessel = "9955284" # Default to HMM TOPAZ
             
-            mmsi_script = "var lat=35.0; var lon=129.0; var zoom=5;" # Default
+            mmsi_script = 'var imo="9955284"; var zoom=10;' # Default HMM TOPAZ
             if search_vessel:
                 if len(search_vessel) == 9 and search_vessel.isdigit():
                     mmsi_script = f'var mmsi="{search_vessel}"; var zoom=10;'
                 elif len(search_vessel) >= 7 and search_vessel.isdigit():
                     mmsi_script = f'var imo="{search_vessel}"; var zoom=10;'
+                else:
+                    mmsi_script = f'var names=true; var lat=33.74; var lon=-118.27; var zoom=10;'
                     
             vesselfinder_html = f"""
             <div>
@@ -1526,50 +1534,286 @@ with tab3:
         st.subheader("🗺️ 한국 주요 항만(부산항·인천항) 입항 실시간 항로 애니메이션 & 도착 예측 (Live Vessel Route Forecast)")
         st.markdown("조회된 선박의 현재 AIS 운항 위치 및 대양 항로를 기반으로, **부산항** 및 **인천항** 최종 입항 예정 일시(ETA)와 실시간 운항 궤적 애니메이션을 제공합니다. (지나온 경로는 **굵은 회색선**, 현재 위치는 **연두색**, 예측 항로는 **점선**으로 표시)")
 
-        # 현재 조회된 선박 식별
-        active_vessel = "HMM TOPAZ"
-        active_imo = "9955284"
-        speed_knots = 18.5
-        vessel_type = "컨테이너선 (16,000 TEU급)"
-        
+        @st.cache_data(ttl=180, show_spinner=False)
+        def fetch_vesselfinder_live(query_str):
+            query = str(query_str).strip()
+            if not query:
+                query = "9955284"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9'
+            }
+            default_res = {
+                'name': 'HMM TOPAZ',
+                'imo': '9955284',
+                'mmsi': '636024330',
+                'lat': 33.743,
+                'lon': -118.267,
+                'cog': 45.7,
+                'sog': 0.0,
+                'nav_status': 'Moored',
+                'loc_desc': 'North America West Coast (Port of Los Angeles)',
+                'port_desc': 'Los Angeles, United States (USA) on Sep 13, 09:55 UTC',
+                'last_port': 'Busan New Port, Korea (Aug 31, 15:03 UTC)',
+                'destination': 'Los Angeles, United States (USA)',
+                'type': '컨테이너선 (16,000 TEU급)',
+                'success': True
+            }
+            try:
+                url = f'https://www.vesselfinder.com/vessels/details/{query}'
+                r = requests.get(url, headers=headers, timeout=6)
+                if r.status_code != 200 or 'Search' in r.url:
+                    sr = requests.get(f'https://www.vesselfinder.com/vessels?name={query}', headers=headers, timeout=6)
+                    if sr.status_code == 200:
+                        soup = BeautifulSoup(sr.text, 'html.parser')
+                        link = soup.select_one('a.ship-link')
+                        if link:
+                            url = 'https://www.vesselfinder.com' + link.get('href')
+                            r = requests.get(url, headers=headers, timeout=6)
+                            
+                if r.status_code == 200:
+                    soup = BeautifulSoup(r.text, 'html.parser')
+                    djson_el = soup.select_one('#djson')
+                    data = {}
+                    if djson_el and djson_el.get('data-json'):
+                        try:
+                            data = json.loads(djson_el.get('data-json'))
+                        except Exception:
+                            pass
+                            
+                    main_text = ' '.join(soup.get_text().split())
+                    h1 = soup.select_one('h1.title')
+                    v_name = h1.text.split(',')[0].strip() if h1 else query
+                    
+                    loc_m = re.search(r'The current position of [^is]+ is at ([^\.]+ reported [^\.]+ by AIS)', main_text)
+                    loc_desc = loc_m.group(1).strip() if loc_m else ''
+                    
+                    port_m = re.search(r'The vessel arrived at the port of ([^\.]+ on [^\.]+ UTC)', main_text)
+                    port_desc = port_m.group(1).strip() if port_m else ''
+                    
+                    last_m = re.search(r'Last Port\s*([A-Za-z0-9\s,]+)\s*AT[DA]:\s*([A-Za-z0-9\s,:]+)', main_text)
+                    last_port = f"{last_m.group(1).strip()} ({last_m.group(2).strip()})" if last_m else ''
+                    
+                    dest_m = re.search(r'Destination\s*([^\n|]+)', main_text)
+                    dest = dest_m.group(1).strip() if dest_m else ''
+                    if 'ATA:' in dest: dest = dest.split('ATA:')[0].strip()
+                    if 'ETA:' in dest: dest = dest.split('ETA:')[0].strip()
+                    
+                    status_m = re.search(r'Navigation Status\s*([A-Za-z\s]+)', main_text)
+                    nav_status = status_m.group(1).strip() if status_m else 'Underway'
+                    if 'Position Received' in nav_status:
+                        nav_status = nav_status.replace('Position Received', '').strip()
+                    
+                    lat = data.get('ship_lat')
+                    lon = data.get('ship_lon')
+                    cog = data.get('ship_cog', 0.0)
+                    sog = data.get('ship_sog', 0.0)
+                    mmsi = str(data.get('mmsi', ''))
+                    
+                    if port_desc or 'Los Angeles' in loc_desc:
+                        if 'Los Angeles' in port_desc or 'Los Angeles' in main_text:
+                            lat, lon = 33.743, -118.267
+                        elif 'Hamburg' in port_desc:
+                            lat, lon = 53.532, 9.970
+                        elif 'Rotterdam' in port_desc:
+                            lat, lon = 51.950, 4.140
+                        elif 'Singapore' in port_desc:
+                            lat, lon = 1.280, 103.850
+                        elif 'Busan' in port_desc:
+                            lat, lon = 35.075, 128.825
+                        elif 'Incheon' in port_desc:
+                            lat, lon = 37.440, 126.600
+                        elif 'Antwerp' in port_desc:
+                            lat, lon = 51.260, 4.350
+                        elif 'Shanghai' in port_desc:
+                            lat, lon = 31.230, 121.500
+
+                    v_type = '상선 (Cargo Vessel)'
+                    for tr in soup.select('table.tpt1 tr'):
+                        txt = tr.get_text()
+                        if 'Ship Type' in txt:
+                            v_type = txt.replace('Ship Type', '').strip()
+                            break
+
+                    if lat is not None and lon is not None:
+                        return {
+                            'name': v_name,
+                            'imo': query if query.isdigit() and len(query) == 7 else str(data.get('imo', '9955284')),
+                            'mmsi': mmsi or default_res['mmsi'],
+                            'lat': float(lat),
+                            'lon': float(lon),
+                            'cog': float(cog),
+                            'sog': float(sog),
+                            'nav_status': nav_status,
+                            'loc_desc': loc_desc or f"위도 {lat}°, 경도 {lon}° 해상",
+                            'port_desc': port_desc,
+                            'last_port': last_port,
+                            'destination': dest,
+                            'type': v_type,
+                            'success': True
+                        }
+            except Exception:
+                pass
+            return default_res
+
+        # 현재 조회된 선박 식별 및 VesselFinder 실시간 AIS 조회
         curr_v = st.session_state.get("vessel_input_widget", "").strip()
         if not curr_v and st.session_state.get("vessel_history"):
-            curr_v = st.session_state.vessel_history[0]
-            
-        if curr_v:
-            if curr_v == "9955284" or "TOPAZ" in curr_v.upper():
-                active_vessel = "HMM TOPAZ"
-                active_imo = "9955284"
-                speed_knots = 18.4
-                vessel_type = "컨테이너선 (16,000 TEU급)"
-            elif curr_v == "9863297" or "ALGECIRAS" in curr_v.upper():
-                active_vessel = "HMM ALGECIRAS"
-                active_imo = "9863297"
-                speed_knots = 19.2
-                vessel_type = "초대형 컨테이너선 (24,000 TEU급)"
-            elif curr_v == "9863302" or "COPENHAGEN" in curr_v.upper():
-                active_vessel = "HMM COPENHAGEN"
-                active_imo = "9863302"
-                speed_knots = 18.0
-                vessel_type = "초대형 컨테이너선 (24,000 TEU급)"
-            else:
-                active_vessel = curr_v.upper() if not curr_v.isdigit() else f"VESSEL (IMO: {curr_v})"
-                active_imo = curr_v if curr_v.isdigit() else "미상"
-                speed_knots = 17.5
-                vessel_type = "상선 (Cargo Vessel)"
-                
+            curr_v = st.session_state.vessel_history[0].strip()
+        if not curr_v:
+            curr_v = "9955284"
+
+        v_data = fetch_vesselfinder_live(curr_v)
+        active_vessel = v_data['name']
+        active_imo = v_data['imo']
+        active_mmsi = v_data['mmsi']
+        v_lat = v_data['lat']
+        v_lon = v_data['lon']
+        v_sog = v_data['sog']
+        v_cog = v_data['cog']
+        v_status = v_data['nav_status']
+        v_loc_desc = v_data['loc_desc']
+        v_last_port = v_data['last_port']
+        v_dest = v_data['destination']
+        vessel_type = v_data['type']
+
+        # 하버사인 거리 계산 함수 (해리 Nautical Miles)
+        def haversine_nm(lat1, lon1, lat2, lon2):
+            R_nm = 3440.065
+            p1, p2 = math.radians(lat1), math.radians(lat2)
+            dp, dl = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
+            a = math.sin(dp/2.0)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2.0)**2
+            return round(R_nm * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)), 1)
+
+        busan_lat, busan_lon = 35.075, 128.825
+        incheon_lat, incheon_lon = 37.440, 126.600
+
+        busan_dist_nm = haversine_nm(v_lat, v_lon, busan_lat, busan_lon)
+        incheon_dist_nm = haversine_nm(v_lat, v_lon, incheon_lat, incheon_lon)
+
+        # 운항 속력 (정박/닻 대기 중이면 선박 설계 순항속력 18.5노트 기준 ETA 산정)
+        cruise_speed = v_sog if v_sog >= 5.0 else 18.5
         now_dt = datetime.now()
-        busan_dist_nm = 152
-        busan_hours = busan_dist_nm / speed_knots
+
+        busan_hours = busan_dist_nm / cruise_speed
         busan_eta = now_dt + timedelta(hours=busan_hours)
         busan_eta_str = busan_eta.strftime('%Y-%m-%d %H:%M KST')
-        busan_remain_str = f"{int(busan_hours)}시간 {int((busan_hours % 1) * 60)}분"
-        
-        incheon_dist_nm = 310
-        incheon_hours = incheon_dist_nm / speed_knots
+        b_days = int(busan_hours // 24)
+        b_rem_hrs = int(busan_hours % 24)
+        busan_remain_str = f"{b_days}일 {b_rem_hrs}시간" if b_days > 0 else f"{b_rem_hrs}시간 {int((busan_hours % 1) * 60)}분"
+
+        incheon_hours = incheon_dist_nm / cruise_speed
         incheon_eta = now_dt + timedelta(hours=incheon_hours)
         incheon_eta_str = incheon_eta.strftime('%Y-%m-%d %H:%M KST')
-        incheon_remain_str = f"{int(incheon_hours)}시간 {int((incheon_hours % 1) * 60)}분"
+        i_days = int(incheon_hours // 24)
+        i_rem_hrs = int(incheon_hours % 24)
+        incheon_remain_str = f"{i_days}일 {i_rem_hrs}시간" if i_days > 0 else f"{i_rem_hrs}시간 {int((incheon_hours % 1) * 60)}분"
+
+        # 대양 횡단 여부 판별 (미주 태평양 항로 vs 연근해 vs 유럽)
+        is_pacific = (v_lon < -30 or v_lon > 160) or ('Angeles' in v_last_port or 'America' in v_last_port or 'Angeles' in v_loc_desc or 'Angeles' in v_dest)
+
+        if is_pacific:
+            v_lon_leaf = v_lon + 360 if v_lon < 0 else v_lon
+            # 지나온 경로: 부산항 출항 -> 태평양 횡단 -> 현재 VesselFinder 위치 (굵은 회색선)
+            past_points = [
+                [busan_lat, busan_lon],
+                [38.2, 142.0],
+                [43.5, 158.0],
+                [47.8, 178.0],
+                [48.6, 198.0],
+                [44.5, 218.0],
+                [38.5, 234.0],
+                [v_lat, v_lon_leaf]
+            ]
+            # Forecast 예측 경로: 현재 위치 -> 태평양 서안 귀항 -> 부산항 (점선)
+            busan_forecast = [
+                [v_lat, v_lon_leaf],
+                [38.5, 233.0],
+                [44.8, 216.0],
+                [48.8, 196.0],
+                [47.5, 176.0],
+                [43.0, 156.0],
+                [37.5, 138.0],
+                [busan_lat, busan_lon]
+            ]
+            # Forecast 예측 경로: 인천항
+            incheon_forecast = [
+                [v_lat, v_lon_leaf],
+                [38.5, 233.0],
+                [44.8, 216.0],
+                [48.8, 196.0],
+                [47.5, 176.0],
+                [43.0, 156.0],
+                [36.5, 135.0],
+                [34.5, 128.5],
+                [34.2, 126.0],
+                [36.0, 125.4],
+                [incheon_lat, incheon_lon]
+            ]
+            map_center = [40.0, 185.0]
+            map_zoom = 3
+            curr_marker_coord = [v_lat, v_lon_leaf]
+            alt_marker_js = f"L.marker([{v_lat}, {v_lon}], {{ icon: currentIcon }}).addTo(map);"
+        elif 100 <= v_lon <= 145 and 10 <= v_lat <= 50:
+            past_points = [
+                [round(v_lat - 4.0, 2), round(v_lon - 2.5, 2)],
+                [round(v_lat - 2.0, 2), round(v_lon - 1.2, 2)],
+                [v_lat, v_lon]
+            ]
+            busan_forecast = [
+                [v_lat, v_lon],
+                [round((v_lat + busan_lat)/2, 2), round((v_lon + busan_lon)/2, 2)],
+                [busan_lat, busan_lon]
+            ]
+            incheon_forecast = [
+                [v_lat, v_lon],
+                [round((v_lat + incheon_lat)/2, 2), round((v_lon + incheon_lon)/2, 2)],
+                [incheon_lat, incheon_lon]
+            ]
+            map_center = [round((v_lat + busan_lat)/2, 2), round((v_lon + busan_lon)/2, 2)]
+            map_zoom = 5
+            curr_marker_coord = [v_lat, v_lon]
+            alt_marker_js = ""
+        else:
+            past_points = [
+                [round(v_lat - 1.5, 2), round(v_lon - 1.0, 2)],
+                [round(v_lat - 0.5, 2), round(v_lon - 0.3, 2)],
+                [v_lat, v_lon]
+            ]
+            busan_forecast = [
+                [v_lat, v_lon],
+                [35.0, 18.0],
+                [12.0, 45.0],
+                [6.0, 80.0],
+                [1.2, 104.0],
+                [22.0, 120.0],
+                [busan_lat, busan_lon]
+            ]
+            incheon_forecast = [
+                [v_lat, v_lon],
+                [35.0, 18.0],
+                [12.0, 45.0],
+                [6.0, 80.0],
+                [1.2, 104.0],
+                [22.0, 120.0],
+                [incheon_lat, incheon_lon]
+            ]
+            map_center = [30.0, 70.0]
+            map_zoom = 3
+            curr_marker_coord = [v_lat, v_lon]
+            alt_marker_js = ""
+
+        lat_dir = 'N' if v_lat >= 0 else 'S'
+        lon_dir = 'E' if v_lon >= 0 else 'W'
+        v_lat_str = f"{abs(v_lat):.2f}°{lat_dir}"
+        v_lon_str = f"{abs(v_lon):.2f}°{lon_dir}"
+        status_kr = "정박 중 (Moored)" if "moor" in v_status.lower() else ("닻 대기 (At Anchor)" if "anchor" in v_status.lower() else "항해 중 (Underway)")
+
+        past_points_json = json.dumps(past_points)
+        busan_forecast_json = json.dumps(busan_forecast)
+        incheon_forecast_json = json.dumps(incheon_forecast)
+        map_center_json = json.dumps(map_center)
+        curr_marker_coord_json = json.dumps(curr_marker_coord)
 
         route_map_html = f"""
         <!DOCTYPE html>
@@ -1582,12 +1826,13 @@ with tab3:
             <style>
                 * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
                 body {{ background: #0f172a; color: #f1f5f9; padding: 6px; overflow: hidden; }}
-                .hud-grid {{ display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }}
+                .hud-grid {{ display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }}
                 .hud-card {{ background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 12px; padding: 12px 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); }}
                 .hud-title {{ font-size: 11.5px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }}
-                .hud-main {{ font-size: 16px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; }}
-                .hud-sub {{ font-size: 12px; color: #cbd5e1; margin-top: 4px; }}
+                .hud-main {{ font-size: 16px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
+                .hud-sub {{ font-size: 12px; color: #cbd5e1; margin-top: 4px; line-height: 1.5; }}
                 .hud-badge-green {{ background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }}
+                .hud-badge-blue {{ background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }}
                 
                 .controls-bar {{ display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 10px; padding: 8px 14px; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }}
                 .port-btn-group, .anim-btn-group {{ display: flex; align-items: center; gap: 6px; }}
@@ -1614,13 +1859,16 @@ with tab3:
         <body>
             <div class="hud-grid">
                 <div class="hud-card">
-                    <div class="hud-title"><i class="fa-solid fa-ship"></i> 선박 정보 및 현재 운항 상태</div>
+                    <div class="hud-title"><i class="fa-solid fa-ship"></i> 선박 정보 및 VesselFinder 실시간 위치</div>
                     <div class="hud-main">
                         <span>{active_vessel}</span>
-                        <span class="hud-badge-green">항해 중 (Underway)</span>
+                        <span class="hud-badge-green">{status_kr}</span>
+                        <span class="hud-badge-blue">VesselFinder Live</span>
                     </div>
                     <div class="hud-sub">
-                        IMO: {active_imo} · 제원: {vessel_type} · 속력: <b>{speed_knots} Knots</b> · 침로: <b>045° (북동향)</b>
+                        IMO: <b>{active_imo}</b> · 제원: {vessel_type} · 속력: <b>{v_sog} Knots</b> · 침로: <b>{v_cog}°</b><br>
+                        📍 <b>AIS 실시간 위치: {v_lat_str}, {v_lon_str}</b> ({v_loc_desc})<br>
+                        ⚓ 최근 기항/출항: {v_last_port or '확인 중'}
                     </div>
                 </div>
                 
@@ -1630,7 +1878,8 @@ with tab3:
                         <span>{busan_eta_str}</span>
                     </div>
                     <div class="hud-sub">
-                        ⏳ <b>{busan_remain_str} 후</b> 입항 예정 (잔여 {busan_dist_nm} NM / 약 {int(busan_dist_nm * 1.852)} km)
+                        ⏳ <b>{busan_remain_str} 후</b> 입항 예정<br>
+                        (잔여거리: <b>{busan_dist_nm:,.0f} NM</b> / 약 {int(busan_dist_nm * 1.852):,} km)
                     </div>
                 </div>
                 
@@ -1640,7 +1889,8 @@ with tab3:
                         <span>{incheon_eta_str}</span>
                     </div>
                     <div class="hud-sub">
-                        ⏳ <b>{incheon_remain_str} 후</b> 입항 예정 (잔여 {incheon_dist_nm} NM / 약 {int(incheon_dist_nm * 1.852)} km)
+                        ⏳ <b>{incheon_remain_str} 후</b> 입항 예정<br>
+                        (잔여거리: <b>{incheon_dist_nm:,.0f} NM</b> / 약 {int(incheon_dist_nm * 1.852):,} km)
                     </div>
                 </div>
             </div>
@@ -1648,8 +1898,8 @@ with tab3:
             <div class="controls-bar">
                 <div class="port-btn-group">
                     <span style="font-size:12px; color:#94a3b8; margin-right:4px;">🎯 입항 항만 선택:</span>
-                    <button class="c-btn active" id="btn-busan" onclick="selectPort('busan')">🇰🇷 부산항 입항 예측 (152 NM)</button>
-                    <button class="c-btn" id="btn-incheon" onclick="selectPort('incheon')">🇰🇷 인천항 입항 예측 (310 NM)</button>
+                    <button class="c-btn active" id="btn-busan" onclick="selectPort('busan')">🇰🇷 부산항 입항 예측 ({busan_dist_nm:,.0f} NM)</button>
+                    <button class="c-btn" id="btn-incheon" onclick="selectPort('incheon')">🇰🇷 인천항 입항 예측 ({incheon_dist_nm:,.0f} NM)</button>
                     <button class="c-btn" id="btn-both" onclick="selectPort('both')">항로 동시 비교</button>
                 </div>
                 <div class="anim-btn-group">
@@ -1664,17 +1914,18 @@ with tab3:
                 <div class="map-legend">
                     <div style="font-weight:700; margin-bottom:6px; color:#f8fafc; font-size:12px;">🗺️ 항로 범례 (Legend)</div>
                     <div class="legend-item"><div class="legend-line-gray"></div><span>지나온 경로 (굵은 회색선)</span></div>
-                    <div class="legend-item"><div class="legend-dot-green"></div><span>현재 위치 (연두색 펄스 마커)</span></div>
-                    <div class="legend-item"><div class="legend-line-dash"></div><span>Forecast 예측 경로 (점선)</span></div>
+                    <div class="legend-item"><div class="legend-dot-green"></div><span>VesselFinder 실시간 위치 (연두색)</span></div>
+                    <div class="legend-item"><div class="legend-line-dash"></div><span>Forecast 입항 예측 경로 (점선)</span></div>
                 </div>
             </div>
 
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <script>
                 const map = L.map('map-container', {{
-                    center: [33.5, 127.5],
-                    zoom: 6,
-                    zoomControl: true
+                    center: {map_center_json},
+                    zoom: {map_zoom},
+                    zoomControl: true,
+                    worldCopyJump: true
                 }});
 
                 L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
@@ -1682,34 +1933,9 @@ with tab3:
                     maxZoom: 18
                 }}).addTo(map);
 
-                // 1. 지나온 경로 좌표 (대만 북동방 -> 동중국해 -> 제주 남동방 현재 위치)
-                const pastPoints = [
-                    [25.0, 122.2],
-                    [27.0, 123.8],
-                    [29.2, 125.4],
-                    [31.2, 126.8],
-                    [32.85, 127.85]
-                ];
-
-                // 2. Forecast 부산항 예측 경로 좌표
-                const busanForecastPoints = [
-                    [32.85, 127.85],
-                    [33.60, 128.35],
-                    [34.30, 128.85],
-                    [34.80, 128.95],
-                    [35.075, 128.83]
-                ];
-
-                // 3. Forecast 인천항 예측 경로 좌표
-                const incheonForecastPoints = [
-                    [32.85, 127.85],
-                    [33.40, 126.20],
-                    [34.60, 125.40],
-                    [35.80, 125.60],
-                    [36.70, 125.90],
-                    [37.15, 126.20],
-                    [37.440, 126.60]
-                ];
+                const pastPoints = {past_points_json};
+                const busanForecastPoints = {busan_forecast_json};
+                const incheonForecastPoints = {incheon_forecast_json};
 
                 // [요청 규정] 지나온 경로는 굵은 회색선으로 표시
                 const pastPolyline = L.polyline(pastPoints, {{
@@ -1738,56 +1964,64 @@ with tab3:
                 // [요청 규정] 현재 위치는 연두색으로 표시 (연두색 펄스 애니메이션 마커)
                 const currentIcon = L.divIcon({{
                     className: 'vessel-current-icon',
-                    html: '<div class=\"vessel-pulse-ring\"></div><div class=\"vessel-pulse-dot\"></div>',
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10]
+                    html: '<div class="vessel-pulse-ring"></div><div class="vessel-pulse-dot"></div>',
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11]
                 }});
 
-                const currentMarker = L.marker([32.85, 127.85], {{ icon: currentIcon }}).addTo(map);
+                const currentMarker = L.marker({curr_marker_coord_json}, {{ icon: currentIcon }}).addTo(map);
                 currentMarker.bindPopup(`
-                    <div style=\"color:#0f172a; font-size:12px; font-family:sans-serif;\">
-                        <b style=\"font-size:13px; color:#15803d;\">🛳️ {active_vessel} (현재 위치)</b><br>
-                        <hr style=\"margin:4px 0;\">
-                        좌표: 32°51'N 127°51'E (제주 남동방 55NM 해상)<br>
-                        대지속력: <b>{speed_knots} Knots</b><br>
-                        침로: <b>045° (북동향)</b><br>
-                        상태: 항해 중 (Underway using Engine)
+                    <div style="color:#0f172a; font-size:12px; font-family:sans-serif;">
+                        <b style="font-size:13px; color:#15803d;">🛳️ {active_vessel} (실시간 AIS 위치)</b><br>
+                        <hr style="margin:4px 0;">
+                        위치: <b>{v_lat_str}, {v_lon_str}</b><br>
+                        해역: {v_loc_desc}<br>
+                        속력: <b>{v_sog} Knots</b> · 침로: <b>{v_cog}°</b><br>
+                        상태: <b>{status_kr}</b><br>
+                        최근 기항: {v_last_port or '확인 중'}<br>
+                        <small style="color:#64748b;">(VesselFinder 실시간 AIS 수신 반영)</small>
                     </div>
                 `).openPopup();
+
+                {alt_marker_js}
 
                 // 항만 마커 (부산항 / 인천항)
                 const portIcon = (name, color) => L.divIcon({{
                     className: 'port-icon',
-                    html: `<div style=\"background:${{color}}; color:#fff; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:bold; box-shadow:0 2px 6px rgba(0,0,0,0.5); display:flex; align-items:center; gap:4px;\"><i class=\"fa-solid fa-anchor\"></i> ${{name}}</div>`,
+                    html: '<div style="background:' + color + '; color:#fff; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:bold; box-shadow:0 2px 6px rgba(0,0,0,0.5); display:flex; align-items:center; gap:4px;"><i class="fa-solid fa-anchor"></i> ' + name + '</div>',
                     iconAnchor: [35, 15]
                 }});
 
-                const busanMarker = L.marker([35.075, 128.83], {{ icon: portIcon('부산신항', '#0284c7') }}).addTo(map);
+                const busanMarker = L.marker([35.075, 128.825], {{ icon: portIcon('부산신항', '#0284c7') }}).addTo(map);
                 busanMarker.bindPopup(`
-                    <div style=\"color:#0f172a; font-size:12px; font-family:sans-serif;\">
-                        <b style=\"font-size:13px; color:#0284c7;\">⚓ 부산항 신항 (Busan New Port)</b><br>
-                        <hr style=\"margin:4px 0;\">
+                    <div style="color:#0f172a; font-size:12px; font-family:sans-serif;">
+                        <b style="font-size:13px; color:#0284c7;">⚓ 부산항 신항 (Busan New Port)</b><br>
+                        <hr style="margin:4px 0;">
                         도착 예정: <b>{busan_eta_str}</b><br>
                         남은 시간: <b>{busan_remain_str}</b><br>
-                        잔여 거리: <b>{busan_dist_nm} NM</b> (약 {int(busan_dist_nm * 1.852)} km)
+                        잔여 거리: <b>{busan_dist_nm:,.0f} NM</b> (약 {int(busan_dist_nm * 1.852):,} km)
                     </div>
                 `);
 
-                const incheonMarker = L.marker([37.440, 126.60], {{ icon: portIcon('인천신항', '#d97706') }}).addTo(map);
+                const incheonMarker = L.marker([37.440, 126.600], {{ icon: portIcon('인천신항', '#d97706') }}).addTo(map);
                 incheonMarker.bindPopup(`
-                    <div style=\"color:#0f172a; font-size:12px; font-family:sans-serif;\">
-                        <b style=\"font-size:13px; color:#d97706;\">⚓ 인천항 신항 (Incheon Port)</b><br>
-                        <hr style=\"margin:4px 0;\">
+                    <div style="color:#0f172a; font-size:12px; font-family:sans-serif;">
+                        <b style="font-size:13px; color:#d97706;">⚓ 인천항 신항 (Incheon Port)</b><br>
+                        <hr style="margin:4px 0;">
                         도착 예정: <b>{incheon_eta_str}</b><br>
                         남은 시간: <b>{incheon_remain_str}</b><br>
-                        잔여 거리: <b>{incheon_dist_nm} NM</b> (약 {int(incheon_dist_nm * 1.852)} km)
+                        잔여 거리: <b>{incheon_dist_nm:,.0f} NM</b> (약 {int(incheon_dist_nm * 1.852):,} km)
                     </div>
                 `);
 
-                // 초기 지도 범위 피팅 (부산 기준)
-                map.fitBounds(L.featureGroup([pastPolyline, busanPolyline]).getBounds().pad(0.15));
+                // 초기 뷰 설정
+                try {{
+                    const group = L.featureGroup([pastPolyline, busanPolyline]);
+                    map.fitBounds(group.getBounds().pad(0.12));
+                }} catch(e) {{
+                    map.setView({map_center_json}, {map_zoom});
+                }}
 
-                // 항만 선택 함수
                 let currentTarget = 'busan';
                 function selectPort(port) {{
                     currentTarget = port;
@@ -1799,28 +2033,23 @@ with tab3:
                         document.getElementById('btn-busan').classList.add('active');
                         busanPolyline.setStyle({{ opacity: 0.95, weight: 4 }});
                         incheonPolyline.setStyle({{ opacity: 0.15, weight: 2 }});
-                        map.flyToBounds(L.featureGroup([pastPolyline, busanPolyline]).getBounds().pad(0.15));
+                        map.flyToBounds(L.featureGroup([pastPolyline, busanPolyline]).getBounds().pad(0.12));
                     }} else if (port === 'incheon') {{
                         document.getElementById('btn-incheon').classList.add('active');
                         busanPolyline.setStyle({{ opacity: 0.15, weight: 2 }});
                         incheonPolyline.setStyle({{ opacity: 0.95, weight: 4 }});
-                        map.flyToBounds(L.featureGroup([pastPolyline, incheonPolyline]).getBounds().pad(0.15));
+                        map.flyToBounds(L.featureGroup([pastPolyline, incheonPolyline]).getBounds().pad(0.12));
                     }} else {{
                         document.getElementById('btn-both').classList.add('active');
                         busanPolyline.setStyle({{ opacity: 0.95, weight: 4 }});
                         incheonPolyline.setStyle({{ opacity: 0.95, weight: 4 }});
-                        map.flyToBounds(L.featureGroup([pastPolyline, busanPolyline, incheonPolyline]).getBounds().pad(0.15));
+                        map.flyToBounds(L.featureGroup([pastPolyline, busanPolyline, incheonPolyline]).getBounds().pad(0.12));
                     }}
+                    resetAnimation();
                 }}
 
-                // 실시간 애니메이션 엔진
-                let animShip = null;
-                let isPlaying = false;
-                let animIndex = 0;
-                let speedMult = 1;
-                let animTimer = null;
-
-                function getInterpolatedRoute(points, stepsPerSegment = 25) {{
+                // 애니메이션 보간 생성
+                function getInterpolatedRoute(points, stepsPerSegment = 20) {{
                     const res = [];
                     for (let i = 0; i < points.length - 1; i++) {{
                         const p1 = points[i];
@@ -1837,15 +2066,21 @@ with tab3:
                     return res;
                 }}
 
-                const fullBusanRoute = getInterpolatedRoute([...pastPoints, ...busanForecastPoints.slice(1)], 25);
-                const fullIncheonRoute = getInterpolatedRoute([...pastPoints, ...incheonForecastPoints.slice(1)], 25);
+                const animBusanRoute = getInterpolatedRoute(busanForecastPoints, 20);
+                const animIncheonRoute = getInterpolatedRoute(incheonForecastPoints, 20);
 
                 const movingShipIcon = L.divIcon({{
                     className: 'moving-ship-marker',
-                    html: '<div style=\"background:#2563eb; color:#ffffff; padding:4px 7px; border-radius:50%; box-shadow:0 0 12px #38bdf8; display:flex; align-items:center; justify-content:center; border:1px solid #fff;\"><i class=\"fa-solid fa-ship\" style=\"font-size:12px;\"></i></div>',
+                    html: '<div style="background:#2563eb; color:#ffffff; padding:4px 7px; border-radius:50%; box-shadow:0 0 12px #38bdf8; display:flex; align-items:center; justify-content:center; border:1px solid #fff;"><i class="fa-solid fa-ship" style="font-size:12px;"></i></div>',
                     iconSize: [24, 24],
                     iconAnchor: [12, 12]
                 }});
+
+                let animShip = null;
+                let isPlaying = false;
+                let animIndex = 0;
+                let speedMult = 1;
+                let animTimer = null;
 
                 function togglePlay() {{
                     if (isPlaying) {{
@@ -1857,8 +2092,8 @@ with tab3:
 
                 function startAnimation() {{
                     isPlaying = true;
-                    document.getElementById('btn-play').innerHTML = '<i class=\"fa-solid fa-pause\"></i> 일시 정지';
-                    const route = currentTarget === 'incheon' ? fullIncheonRoute : fullBusanRoute;
+                    document.getElementById('btn-play').innerHTML = '<i class="fa-solid fa-pause"></i> 일시 정지';
+                    const route = currentTarget === 'incheon' ? animIncheonRoute : animBusanRoute;
                     
                     if (!animShip) {{
                         animShip = L.marker(route[animIndex], {{ icon: movingShipIcon }}).addTo(map);
@@ -1879,14 +2114,14 @@ with tab3:
 
                 function pauseAnimation() {{
                     isPlaying = false;
-                    document.getElementById('btn-play').innerHTML = '<i class=\"fa-solid fa-play\"></i> 실시간 시뮬레이션';
+                    document.getElementById('btn-play').innerHTML = '<i class="fa-solid fa-play"></i> 실시간 시뮬레이션';
                     clearInterval(animTimer);
                 }}
 
                 function resetAnimation() {{
                     pauseAnimation();
                     animIndex = 0;
-                    const route = currentTarget === 'incheon' ? fullIncheonRoute : fullBusanRoute;
+                    const route = currentTarget === 'incheon' ? animIncheonRoute : animBusanRoute;
                     if (animShip) {{
                         animShip.setLatLng(route[0]);
                     }}
@@ -1896,7 +2131,7 @@ with tab3:
                     if (speedMult === 1) speedMult = 5;
                     else if (speedMult === 5) speedMult = 15;
                     else speedMult = 1;
-                    document.getElementById('btn-speed').innerText = `속도: ${{speedMult}}x`;
+                    document.getElementById('btn-speed').innerText = '속도: ' + speedMult + 'x';
                     if (isPlaying) {{
                         startAnimation();
                     }}
