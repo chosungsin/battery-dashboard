@@ -7,6 +7,11 @@ from plotly.subplots import make_subplots
 import plotly.express as px
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+import zipfile
+import io
+import re
+from concurrent.futures import ThreadPoolExecutor
+from bs4 import BeautifulSoup
 
 st.set_page_config(page_title="거시경제 지표 대시보드", layout="wide")
 
@@ -578,24 +583,295 @@ with tab3:
             st.warning("데이터를 불러올 수 없습니다. (DART API 키 미등록 및 yfinance 응답 지연)")
             
     with col_disc:
-        st.subheader("📢 최근 주요 공시 (Recent Disclosures)")
+        st.subheader("📢 최근 주요 공시 및 상세 요약 (Recent Disclosures)")
         
-        @st.cache_data(ttl=3600)
-        def fetch_dart_disclosures(corp_code):
+        def format_dart_currency(num_str):
+            clean = re.sub(r'[^0-9-]', '', num_str)
+            if not clean or clean == '-': return ''
+            try:
+                val = int(clean)
+                abs_val = abs(val)
+                if abs_val >= 1000000000000:
+                    jo = abs_val // 1000000000000
+                    eok = (abs_val % 1000000000000) // 100000000
+                    res = f'{jo}조 {eok:,}억원' if eok else f'{jo}조원'
+                elif abs_val >= 100000000:
+                    res = f'{abs_val // 100000000:,}억원'
+                else:
+                    res = f'{abs_val:,}원'
+                return ('-' if val < 0 else '') + res
+            except:
+                return num_str
+
+        @st.cache_data(ttl=86400)
+        def get_single_disclosure_summary(rcept_no, report_nm):
+            url = f"https://opendart.fss.or.kr/api/document.xml?crtfc_key={DART_API_KEY}&rcept_no={rcept_no}"
+            try:
+                r = requests.get(url, timeout=4)
+                if r.status_code != 200 or len(r.content) < 50:
+                    return "상세 공시 본문 및 첨부 서류는 원본 문서를 참조하십시오."
+                z = zipfile.ZipFile(io.BytesIO(r.content))
+                raw = z.read(z.namelist()[0]).decode('utf-8', errors='ignore')
+                soup = BeautifulSoup(raw, 'html.parser')
+                for s in soup(['script', 'style']):
+                    s.decompose()
+                text = soup.get_text('\n')
+                lines = [l.strip() for l in text.splitlines() if l.strip()]
+                joined = '\n'.join(lines)
+                
+                points = []
+                
+                # 1. 기업설명회 (IR)
+                if 'IR' in report_nm or '기업설명회' in report_nm:
+                    m_time = re.search(r'일시\s*([0-9]{4}[^\n]+)', joined)
+                    m_purp = re.search(r'개최목적\s*([^\n]+)', joined)
+                    m_place = re.search(r'장소\s*([^\n]+)', joined)
+                    if m_time: points.append(f"📅 일시: {m_time.group(1).strip()}")
+                    if m_place and '일시' not in m_place.group(1): points.append(f"📍 장소: {m_place.group(1).strip()}")
+                    if m_purp: points.append(f"🎯 목적: {m_purp.group(1).strip()}")
+                    
+                # 2. 금전대여 / 담보제공 / 채무보증
+                elif any(k in report_nm for k in ['금전대여', '담보제공', '채무보증']):
+                    m_target = re.search(r'(?:대여\s*상대|채무자|담보제공\s*상대)\s*([^\n]+)', joined)
+                    m_amt = re.search(r'(?:대여금액|채무보증금액|담보설정금액)\s*(?:\(원\))?\s*([0-9,]+)', joined)
+                    if m_target: points.append(f"🏢 대상: {m_target.group(1).strip()}")
+                    if m_amt: points.append(f"💰 금액: {format_dart_currency(m_amt.group(1))}")
+                    
+                # 3. 타법인 주식 취득/처분
+                elif any(k in report_nm for k in ['타법인주식', '출자증권']):
+                    m_target = re.search(r'(?:발행회사|대상회사|법인명)\s*([^\n]+)', joined)
+                    m_amt = re.search(r'(?:처분금액|취득금액)\s*(?:\(원\))?\s*([0-9,]+)', joined)
+                    m_purp = re.search(r'(?:처분목적|취득목적)\s*([^\n]+)', joined)
+                    if m_target and m_target.group(1).strip() != '회사명': points.append(f"🏢 대상법인: {m_target.group(1).strip()}")
+                    if m_amt: points.append(f"💰 거래금액: {format_dart_currency(m_amt.group(1))}")
+                    if m_purp: points.append(f"🎯 목적: {m_purp.group(1).strip()}")
+                    
+                # 4. 실적 공시 (잠정실적 등)
+                elif '실적' in report_nm:
+                    m_rev = re.search(r'매출액\s*(?:당해실적)?\s*([0-9,]+)', joined)
+                    m_op = re.search(r'영업이익\s*(?:당해실적)?\s*([-0-9,]+)', joined)
+                    if m_rev: points.append(f"📈 매출액: {m_rev.group(1)}억원")
+                    if m_op: points.append(f"📊 영업이익: {m_op.group(1)}억원")
+                    
+                # 5. 공급계약 / 단일판매
+                elif any(k in report_nm for k in ['공급계약', '단일판매']):
+                    m_cust = re.search(r'계약상대방?\s*([^\n]+)', joined)
+                    m_amt = re.search(r'계약금액\s*(?:\(원\))?\s*([0-9,]+)', joined)
+                    m_prod = re.search(r'계약내용\s*([^\n]+)', joined)
+                    if m_cust: points.append(f"🤝 상대방: {m_cust.group(1).strip()}")
+                    if m_amt: points.append(f"💰 계약금액: {format_dart_currency(m_amt.group(1))}")
+                    if m_prod: points.append(f"📦 계약내용: {m_prod.group(1).strip()}")
+                    
+                # 6. 임원/주요주주/대량보유
+                elif any(k in report_nm for k in ['임원ㆍ주요주주', '특정증권', '대량보유', '소유주식변동']):
+                    m_who = re.search(r'(?:보고자|성명\(명칭\))\s*:\s*([^\n]+)', joined) or re.search(r'(?:보고자|성명\(명칭\))\s*\n\s*한\s*글\s*\n\s*([^\n]+)', joined)
+                    m_pos = re.search(r'직위명?\s*([^\n]+)', joined)
+                    m_ratio = re.search(r'(?:보유비율|소유비율)\s*([0-9.]+\s*%)', joined)
+                    m_tot = re.search(r'이번보고서제출일\s*\n[^\n]*\n[^\n]*\n[^\n]*\n[^\n]*\n합계\s*\n[^\n]*\n([0-9.]+\s*%)', joined)
+                    who_str = m_who.group(1).strip() if m_who else ''
+                    pos_str = f"({m_pos.group(1).strip()})" if m_pos and m_pos.group(1).strip() != '-' else ''
+                    if who_str: points.append(f"👤 보고자: {who_str} {pos_str}".strip())
+                    if m_ratio: points.append(f"📊 소유비율: {m_ratio.group(1).strip()}")
+                    elif m_tot: points.append(f"📊 소유비율: {m_tot.group(1).strip()}")
+                    
+                # 7. 정기보고서 (반기/분기/사업보고서)
+                elif any(k in report_nm for k in ['사업보고서', '반기보고서', '분기보고서']):
+                    m_p = re.search(r'사업연도\s*([0-9]{4}[^\n]+)', joined)
+                    m_ceo = re.search(r'대\s*표\s*이\s*사\s*:\s*([^\n]+)', joined)
+                    if m_p: points.append(f"🗓️ 사업연도: {m_p.group(1).strip()}")
+                    if m_ceo: points.append(f"👤 대표이사: {m_ceo.group(1).strip()}")
+                    points.append("재무제표 및 사업부문별 경영실적 법정 정기보고")
+                    
+                # 8. 대규모기업집단 현황
+                elif '대규모기업집단' in report_nm:
+                    points.append("공정거래법에 따른 분기별 계열회사 간 거래·채무보증·지배구조 현황 공시")
+                    
+                # 9. 지급수단별 지급금액
+                elif '지급수단' in report_nm:
+                    points.append("수탁기업 하도급 및 납품대금 지급수단별·기간별 결제현황 공시")
+                    
+                # 10. 계열회사와의 거래
+                elif '계열회사와의상품' in report_nm or '동일인등출자' in report_nm:
+                    points.append("공정거래법에 따른 계열회사 간 상품·용역 거래내역 공시")
+
+                # 정정사항 체크
+                if '정정' in report_nm:
+                    m_reason = re.search(r'정정사유\s*([^\n]+)', joined)
+                    if m_reason and '정 정 전' not in m_reason.group(1):
+                        points.append(f"📝 정정사유: {m_reason.group(1).strip()}")
+                    
+                if not points:
+                    for l in lines[4:]:
+                        if len(l) > 15 and not any(w in l for w in ['귀중', '금융위', '한국거래소', '전화', '팩스', '본점', '발행회사']):
+                            points.append(l[:90])
+                            if len(points) >= 2: break
+                            
+                return ' · '.join(points) if points else "상세 공시 본문 및 첨부 서류는 원본 문서를 참조하십시오."
+            except Exception as e:
+                return "상세 공시 본문 및 첨부 서류는 원본 문서를 참조하십시오."
+
+        @st.cache_data(ttl=1800)
+        def fetch_dart_disclosures_with_summary(corp_code):
             url = f"https://opendart.fss.or.kr/api/list.json?crtfc_key={DART_API_KEY}&corp_code={corp_code}&bgn_de=20230101&page_count=10"
             try:
-                resp = requests.get(url, timeout=3).json()
+                resp = requests.get(url, timeout=5).json()
                 if resp.get('status') == '000' and 'list' in resp:
-                    df = pd.DataFrame(resp['list'])[['rcept_dt', 'report_nm', 'flr_nm']]
-                    df.columns = ['접수일자', '공시제목', '제출인']
-                    return df
+                    raw_items = resp['list']
+                    
+                    def process_item(item):
+                        r_dt = item.get('rcept_dt', '')
+                        dt_fmt = f"{r_dt[:4]}-{r_dt[4:6]}-{r_dt[6:8]}" if len(r_dt) == 8 else r_dt
+                        title = item.get('report_nm', '').strip()
+                        rcp = item.get('rcept_no', '')
+                        filer = item.get('flr_nm', '').strip()
+                        summary = get_single_disclosure_summary(rcp, title)
+                        link = f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcp}"
+                        return {
+                            'date': dt_fmt,
+                            'title': title,
+                            'filer': filer,
+                            'summary': summary,
+                            'link': link,
+                            'rcept_no': rcp
+                        }
+                        
+                    with ThreadPoolExecutor(max_workers=5) as ex:
+                        disc_results = list(ex.map(process_item, raw_items))
+                    return disc_results, None
                 else:
-                    return pd.DataFrame([{"Message": resp.get('message', 'DART API 연결 실패 (키 미등록 등)')}])
-            except:
-                return pd.DataFrame([{"Message": "네트워크 에러"}])
+                    return [], resp.get('message', 'DART 공시 내역을 불러오지 못했습니다.')
+            except Exception as e:
+                return [], f"네트워크 통신 오류: {e}"
+
+        disc_items, err_msg = fetch_dart_disclosures_with_summary(corp_info['dart'])
+        
+        if err_msg:
+            st.warning(f"⚠️ {err_msg}")
+        elif not disc_items:
+            st.info("최근 공시 내역이 없습니다.")
+        else:
+            col_view_opt, col_count_opt = st.columns([1.2, 0.8])
+            with col_view_opt:
+                view_mode = st.radio("공시 보기 모드", ["요약 카드형 (추천)", "데이터 표 형식"], horizontal=True, label_visibility="collapsed")
+            with col_count_opt:
+                st.markdown(f"<div style='text-align:right; font-size:12px; color:#888; padding-top:6px;'>총 <b>{len(disc_items)}건</b> 최근 공시</div>", unsafe_allow_html=True)
                 
-        df_disc = fetch_dart_disclosures(corp_info['dart'])
-        st.dataframe(df_disc, use_container_width=True, hide_index=True)
+            if view_mode == "요약 카드형 (추천)":
+                cards_html = """
+                <style>
+                .dart-disc-container {
+                    max-height: 480px;
+                    overflow-y: auto;
+                    padding-right: 6px;
+                    scrollbar-width: thin;
+                }
+                .dart-card {
+                    background: rgba(128, 128, 128, 0.05);
+                    border: 1px solid rgba(128, 128, 128, 0.2);
+                    border-radius: 10px;
+                    padding: 12px 14px;
+                    margin-bottom: 10px;
+                    transition: all 0.2s ease;
+                }
+                .dart-card:hover {
+                    border-color: #3b82f6;
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+                }
+                .dart-card-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 6px;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                }
+                .dart-badge-date {
+                    background: rgba(59, 130, 246, 0.15);
+                    color: #3b82f6;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                .dart-badge-filer {
+                    background: rgba(100, 116, 139, 0.15);
+                    color: #64748b;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                }
+                .dart-link-btn {
+                    background: #2563eb;
+                    color: #ffffff !important;
+                    padding: 3px 10px;
+                    border-radius: 6px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-decoration: none !important;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    transition: background 0.15s ease;
+                }
+                .dart-link-btn:hover {
+                    background: #1d4ed8;
+                    color: #ffffff !important;
+                }
+                .dart-card-title {
+                    font-size: 13.5px;
+                    font-weight: 700;
+                    margin-bottom: 6px;
+                    line-height: 1.4;
+                }
+                .dart-summary-box {
+                    background: rgba(59, 130, 246, 0.08);
+                    border-left: 3px solid #3b82f6;
+                    border-radius: 4px;
+                    padding: 7px 11px;
+                    font-size: 12.5px;
+                    line-height: 1.5;
+                }
+                .dart-summary-label {
+                    font-weight: 700;
+                    color: #3b82f6;
+                    margin-right: 4px;
+                }
+                </style>
+                <div class="dart-disc-container">
+                """
+                for item in disc_items:
+                    cards_html += f"""
+                    <div class="dart-card">
+                        <div class="dart-card-header">
+                            <div>
+                                <span class="dart-badge-date">{item['date']}</span>
+                                <span class="dart-badge-filer">{item['filer']}</span>
+                            </div>
+                            <a href="{item['link']}" target="_blank" class="dart-link-btn">
+                                🔗 DART 원본보기 ↗
+                            </a>
+                        </div>
+                        <div class="dart-card-title">{item['title']}</div>
+                        <div class="dart-summary-box">
+                            <span class="dart-summary-label">💡 주요내용 요약:</span>
+                            <span>{item['summary']}</span>
+                        </div>
+                    </div>
+                    """
+                cards_html += "</div>"
+                st.markdown(cards_html, unsafe_allow_html=True)
+            else:
+                df_table = pd.DataFrame(disc_items)[['date', 'title', 'summary', 'filer', 'link']]
+                df_table.columns = ['접수일자', '공시제목', '주요내용 요약', '제출인', 'DART 원본링크']
+                st.dataframe(
+                    df_table,
+                    column_config={
+                        "DART 원본링크": st.column_config.LinkColumn("DART 원본링크", display_text="🔗 원본문서 열람")
+                    },
+                    use_container_width=True,
+                    hide_index=True,
+                    height=450
+                )
 
 
 
