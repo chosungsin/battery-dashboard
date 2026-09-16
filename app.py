@@ -1827,33 +1827,34 @@ with tab3:
                 * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
                 body {{ background: #0f172a; color: #f1f5f9; padding: 6px; overflow: hidden; }}
                 .hud-grid {{ display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }}
-                .hud-card {{ background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 12px; padding: 12px 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); }}
+                .hud-card {{ background: rgba(30, 41, 59, 0.92); border: 1px solid rgba(71, 85, 105, 0.6); border-radius: 12px; padding: 12px 16px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); }}
                 .hud-title {{ font-size: 11.5px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }}
                 .hud-main {{ font-size: 16px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
                 .hud-sub {{ font-size: 12px; color: #cbd5e1; margin-top: 4px; line-height: 1.5; }}
                 .hud-badge-green {{ background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }}
                 .hud-badge-blue {{ background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }}
                 
-                .controls-bar {{ display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 10px; padding: 8px 14px; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }}
-                .port-btn-group, .anim-btn-group {{ display: flex; align-items: center; gap: 6px; }}
-                .c-btn {{ background: #1e293b; color: #e2e8f0; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }}
+                .controls-bar {{ display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(71, 85, 105, 0.6); border-radius: 10px; padding: 8px 14px; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }}
+                .port-btn-group, .theme-btn-group, .anim-btn-group {{ display: flex; align-items: center; gap: 5px; }}
+                .c-btn {{ background: #1e293b; color: #e2e8f0; border: 1px solid #475569; padding: 6px 11px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 5px; }}
                 .c-btn:hover {{ background: #334155; border-color: #64748b; }}
-                .c-btn.active {{ background: #2563eb; color: #ffffff; border-color: #3b82f6; box-shadow: 0 0 10px rgba(37, 99, 235, 0.5); }}
+                .c-btn.active {{ background: #0284c7; color: #ffffff; border-color: #38bdf8; box-shadow: 0 0 10px rgba(2, 132, 199, 0.6); }}
                 
-                #map-container {{ width: 100%; height: 510px; border-radius: 12px; overflow: hidden; border: 1px solid #334155; position: relative; }}
+                #map-container {{ width: 100%; height: 510px; border-radius: 12px; overflow: hidden; border: 1px solid #475569; position: relative; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }}
                 
                 .vessel-current-icon {{ position: relative; display: flex; align-items: center; justify-content: center; }}
-                .vessel-pulse-dot {{ width: 18px; height: 18px; background: #22c55e; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 0 14px #22c55e, 0 0 24px rgba(34, 197, 94, 0.8); z-index: 10; }}
-                .vessel-pulse-ring {{ position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 2.5px solid #4ade80; animation: pulse-wave 1.8s infinite ease-out; z-index: 5; }}
-                @keyframes pulse-wave {{ 0% {{ transform: scale(0.5); opacity: 1; }} 100% {{ transform: scale(1.6); opacity: 0; }} }}
+                .vessel-pulse-dot {{ width: 18px; height: 18px; background: #22c55e; border: 2.5px solid #ffffff; border-radius: 50%; box-shadow: 0 0 14px #22c55e, 0 0 26px rgba(34, 197, 94, 0.9); z-index: 10; }}
+                .vessel-pulse-ring {{ position: absolute; width: 42px; height: 42px; border-radius: 50%; border: 2.5px solid #16a34a; animation: pulse-wave 1.8s infinite ease-out; z-index: 5; }}
+                @keyframes pulse-wave {{ 0% {{ transform: scale(0.4); opacity: 1; }} 100% {{ transform: scale(1.6); opacity: 0; }} }}
                 
                 .moving-ship-marker {{ transition: transform 0.1s linear; }}
                 
-                .map-legend {{ position: absolute; bottom: 20px; left: 20px; z-index: 1000; background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(71, 85, 105, 0.8); border-radius: 8px; padding: 10px 14px; font-size: 11.5px; color: #cbd5e1; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); }}
+                .map-legend {{ position: absolute; bottom: 20px; left: 20px; z-index: 1000; background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px); border: 1px solid rgba(71, 85, 105, 0.8); border-radius: 8px; padding: 10px 14px; font-size: 11.5px; color: #cbd5e1; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); }}
                 .legend-item {{ display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }}
-                .legend-line-gray {{ width: 24px; height: 6px; background: #94a3b8; border-radius: 2px; }}
-                .legend-dot-green {{ width: 12px; height: 12px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; border: 1px solid #fff; }}
-                .legend-line-dash {{ width: 24px; height: 0; border-top: 3px dashed #38bdf8; }}
+                .legend-line-gray {{ width: 24px; height: 6px; background: #475569; border-radius: 2px; box-shadow: 0 0 1px #fff; }}
+                .legend-dot-green {{ width: 12px; height: 12px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; border: 1.5px solid #fff; }}
+                .legend-line-dash-blue {{ width: 24px; height: 0; border-top: 3.5px dashed #0284c7; }}
+                .legend-line-dash-amber {{ width: 24px; height: 0; border-top: 3.5px dashed #ea580c; }}
             </style>
         </head>
         <body>
@@ -1897,14 +1898,21 @@ with tab3:
             
             <div class="controls-bar">
                 <div class="port-btn-group">
-                    <span style="font-size:12px; color:#94a3b8; margin-right:4px;">🎯 입항 항만 선택:</span>
-                    <button class="c-btn active" id="btn-busan" onclick="selectPort('busan')">🇰🇷 부산항 입항 예측 ({busan_dist_nm:,.0f} NM)</button>
-                    <button class="c-btn" id="btn-incheon" onclick="selectPort('incheon')">🇰🇷 인천항 입항 예측 ({incheon_dist_nm:,.0f} NM)</button>
-                    <button class="c-btn" id="btn-both" onclick="selectPort('both')">항로 동시 비교</button>
+                    <span style="font-size:11.5px; color:#94a3b8; font-weight:600; margin-right:2px;">🎯 입항 항만:</span>
+                    <button class="c-btn active" id="btn-busan" onclick="selectPort('busan')">🇰🇷 부산항 ({busan_dist_nm:,.0f} NM)</button>
+                    <button class="c-btn" id="btn-incheon" onclick="selectPort('incheon')">🇰🇷 인천항 ({incheon_dist_nm:,.0f} NM)</button>
+                    <button class="c-btn" id="btn-both" onclick="selectPort('both')">동시 비교</button>
+                </div>
+                <div class="theme-btn-group">
+                    <span style="font-size:11.5px; color:#94a3b8; font-weight:600; margin-right:2px;">🎨 지도 스타일:</span>
+                    <button class="c-btn active" id="btn-theme-voyager" onclick="setBaseMap('voyager')">🗺️ 컬러 지도</button>
+                    <button class="c-btn" id="btn-theme-ocean" onclick="setBaseMap('ocean')">🌊 해양 심해</button>
+                    <button class="c-btn" id="btn-theme-satellite" onclick="setBaseMap('satellite')">🛰️ 위성 영상</button>
+                    <button class="c-btn" id="btn-theme-dark" onclick="setBaseMap('dark')">🌙 다크 모드</button>
                 </div>
                 <div class="anim-btn-group">
-                    <span style="font-size:12px; color:#94a3b8; margin-right:4px;">🎬 항해 애니메이션:</span>
-                    <button class="c-btn" id="btn-play" onclick="togglePlay()"><i class="fa-solid fa-play"></i> 실시간 시뮬레이션</button>
+                    <span style="font-size:11.5px; color:#94a3b8; font-weight:600; margin-right:2px;">🎬 시뮬레이션:</span>
+                    <button class="c-btn" id="btn-play" onclick="togglePlay()"><i class="fa-solid fa-play"></i> 항해 시작</button>
                     <button class="c-btn" id="btn-reset" onclick="resetAnimation()"><i class="fa-solid fa-rotate-left"></i> 초기화</button>
                     <button class="c-btn" id="btn-speed" onclick="toggleSpeed()">속도: 1x</button>
                 </div>
@@ -1915,7 +1923,8 @@ with tab3:
                     <div style="font-weight:700; margin-bottom:6px; color:#f8fafc; font-size:12px;">🗺️ 항로 범례 (Legend)</div>
                     <div class="legend-item"><div class="legend-line-gray"></div><span>지나온 경로 (굵은 회색선)</span></div>
                     <div class="legend-item"><div class="legend-dot-green"></div><span>VesselFinder 실시간 위치 (연두색)</span></div>
-                    <div class="legend-item"><div class="legend-line-dash"></div><span>Forecast 입항 예측 경로 (점선)</span></div>
+                    <div class="legend-item"><div class="legend-line-dash-blue"></div><span>Forecast 부산항 예측 (청색 점선)</span></div>
+                    <div class="legend-item"><div class="legend-line-dash-amber"></div><span>Forecast 인천항 예측 (황색 점선)</span></div>
                 </div>
             </div>
 
@@ -1928,10 +1937,46 @@ with tab3:
                     worldCopyJump: true
                 }});
 
-                L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
-                    attribution: '&copy; CARTO, OpenStreetMap',
-                    maxZoom: 18
-                }}).addTo(map);
+                // 다채로운 컬러 베이스 지도 레이어 정의
+                const baseLayers = {{
+                    voyager: L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+                        attribution: '&copy; CARTO, OpenStreetMap',
+                        maxZoom: 18
+                    }}),
+                    ocean: L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{{z}}/{{y}}/{{x}}', {{
+                        attribution: '&copy; Esri, GEBCO, NOAA',
+                        maxZoom: 16
+                    }}),
+                    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}', {{
+                        attribution: '&copy; Esri, Earthstar Geographics',
+                        maxZoom: 18
+                    }}),
+                    dark: L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+                        attribution: '&copy; CARTO, OpenStreetMap',
+                        maxZoom: 18
+                    }})
+                }};
+
+                // 기본 지도로 선명한 '컬러 지도(Voyager)' 적용
+                let currentBaseLayer = baseLayers.voyager;
+                currentBaseLayer.addTo(map);
+
+                function setBaseMap(theme) {{
+                    if (currentBaseLayer) {{
+                        map.removeLayer(currentBaseLayer);
+                    }}
+                    currentBaseLayer = baseLayers[theme];
+                    currentBaseLayer.addTo(map);
+                    currentBaseLayer.bringToBack();
+
+                    ['voyager', 'ocean', 'satellite', 'dark'].forEach(t => {{
+                        const btn = document.getElementById('btn-theme-' + t);
+                        if (btn) {{
+                            if (t === theme) btn.classList.add('active');
+                            else btn.classList.remove('active');
+                        }}
+                    }});
+                }}
 
                 const pastPoints = {past_points_json};
                 const busanForecastPoints = {busan_forecast_json};
@@ -1939,7 +1984,7 @@ with tab3:
 
                 // [요청 규정] 지나온 경로는 굵은 회색선으로 표시
                 const pastPolyline = L.polyline(pastPoints, {{
-                    color: '#94a3b8',
+                    color: '#475569',
                     weight: 6,
                     opacity: 0.95,
                     lineCap: 'round',
@@ -1948,17 +1993,17 @@ with tab3:
 
                 // [요청 규정] Forecast는 점선으로 표시 (부산항: 청색 점선, 인천항: 황색 점선)
                 const busanPolyline = L.polyline(busanForecastPoints, {{
-                    color: '#38bdf8',
+                    color: '#0284c7',
                     weight: 4,
                     dashArray: '8, 8',
                     opacity: 0.95
                 }}).addTo(map);
 
                 const incheonPolyline = L.polyline(incheonForecastPoints, {{
-                    color: '#fbbf24',
+                    color: '#ea580c',
                     weight: 4,
                     dashArray: '8, 8',
-                    opacity: 0.85
+                    opacity: 0.9
                 }}).addTo(map);
 
                 // [요청 규정] 현재 위치는 연두색으로 표시 (연두색 펄스 애니메이션 마커)
@@ -2003,10 +2048,10 @@ with tab3:
                     </div>
                 `);
 
-                const incheonMarker = L.marker([37.440, 126.600], {{ icon: portIcon('인천신항', '#d97706') }}).addTo(map);
+                const incheonMarker = L.marker([37.440, 126.600], {{ icon: portIcon('인천신항', '#ea580c') }}).addTo(map);
                 incheonMarker.bindPopup(`
                     <div style="color:#0f172a; font-size:12px; font-family:sans-serif;">
-                        <b style="font-size:13px; color:#d97706;">⚓ 인천항 신항 (Incheon Port)</b><br>
+                        <b style="font-size:13px; color:#ea580c;">⚓ 인천항 신항 (Incheon Port)</b><br>
                         <hr style="margin:4px 0;">
                         도착 예정: <b>{incheon_eta_str}</b><br>
                         남은 시간: <b>{incheon_remain_str}</b><br>
@@ -2071,7 +2116,7 @@ with tab3:
 
                 const movingShipIcon = L.divIcon({{
                     className: 'moving-ship-marker',
-                    html: '<div style="background:#2563eb; color:#ffffff; padding:4px 7px; border-radius:50%; box-shadow:0 0 12px #38bdf8; display:flex; align-items:center; justify-content:center; border:1px solid #fff;"><i class="fa-solid fa-ship" style="font-size:12px;"></i></div>',
+                    html: '<div style="background:#0284c7; color:#ffffff; padding:4px 7px; border-radius:50%; box-shadow:0 0 12px #38bdf8; display:flex; align-items:center; justify-content:center; border:2px solid #fff;"><i class="fa-solid fa-ship" style="font-size:12px;"></i></div>',
                     iconSize: [24, 24],
                     iconAnchor: [12, 12]
                 }});
@@ -2114,7 +2159,7 @@ with tab3:
 
                 function pauseAnimation() {{
                     isPlaying = false;
-                    document.getElementById('btn-play').innerHTML = '<i class="fa-solid fa-play"></i> 실시간 시뮬레이션';
+                    document.getElementById('btn-play').innerHTML = '<i class="fa-solid fa-play"></i> 항해 시작';
                     clearInterval(animTimer);
                 }}
 
@@ -2140,7 +2185,7 @@ with tab3:
         </body>
         </html>
         """
-        components.html(route_map_html, height=720, scrolling=False)
+        components.html(route_map_html, height=735, scrolling=False)
 
 with tab5:
     st.header("🇺🇸 미국 이차전지 부품 수출 관세율 변동 추이")
