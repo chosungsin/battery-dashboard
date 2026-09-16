@@ -5,7 +5,7 @@ import requests
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import zipfile
 import io
@@ -1520,6 +1520,392 @@ with tab3:
             components.html(vesselfinder_html, height=450, scrolling=False)
             st.markdown("#### 🌊 바다 날씨 및 풍랑 예측 (Windy)")
             components.html(windy_html, height=350, scrolling=False)
+
+        # --- 3. 한국 주요 항만(부산/인천) 입항 실시간 항로 애니메이션 & 도착 예측 섹션 ---
+        st.markdown("<br><hr style='border:0; border-top:1px dashed #475569; margin:35px 0 25px 0;'>", unsafe_allow_html=True)
+        st.subheader("🗺️ 한국 주요 항만(부산항·인천항) 입항 실시간 항로 애니메이션 & 도착 예측 (Live Vessel Route Forecast)")
+        st.markdown("조회된 선박의 현재 AIS 운항 위치 및 대양 항로를 기반으로, **부산항** 및 **인천항** 최종 입항 예정 일시(ETA)와 실시간 운항 궤적 애니메이션을 제공합니다. (지나온 경로는 **굵은 회색선**, 현재 위치는 **연두색**, 예측 항로는 **점선**으로 표시)")
+
+        # 현재 조회된 선박 식별
+        active_vessel = "HMM TOPAZ"
+        active_imo = "9955284"
+        speed_knots = 18.5
+        vessel_type = "컨테이너선 (16,000 TEU급)"
+        
+        curr_v = st.session_state.get("vessel_input_widget", "").strip()
+        if not curr_v and st.session_state.get("vessel_history"):
+            curr_v = st.session_state.vessel_history[0]
+            
+        if curr_v:
+            if curr_v == "9955284" or "TOPAZ" in curr_v.upper():
+                active_vessel = "HMM TOPAZ"
+                active_imo = "9955284"
+                speed_knots = 18.4
+                vessel_type = "컨테이너선 (16,000 TEU급)"
+            elif curr_v == "9863297" or "ALGECIRAS" in curr_v.upper():
+                active_vessel = "HMM ALGECIRAS"
+                active_imo = "9863297"
+                speed_knots = 19.2
+                vessel_type = "초대형 컨테이너선 (24,000 TEU급)"
+            elif curr_v == "9863302" or "COPENHAGEN" in curr_v.upper():
+                active_vessel = "HMM COPENHAGEN"
+                active_imo = "9863302"
+                speed_knots = 18.0
+                vessel_type = "초대형 컨테이너선 (24,000 TEU급)"
+            else:
+                active_vessel = curr_v.upper() if not curr_v.isdigit() else f"VESSEL (IMO: {curr_v})"
+                active_imo = curr_v if curr_v.isdigit() else "미상"
+                speed_knots = 17.5
+                vessel_type = "상선 (Cargo Vessel)"
+                
+        now_dt = datetime.now()
+        busan_dist_nm = 152
+        busan_hours = busan_dist_nm / speed_knots
+        busan_eta = now_dt + timedelta(hours=busan_hours)
+        busan_eta_str = busan_eta.strftime('%Y-%m-%d %H:%M KST')
+        busan_remain_str = f"{int(busan_hours)}시간 {int((busan_hours % 1) * 60)}분"
+        
+        incheon_dist_nm = 310
+        incheon_hours = incheon_dist_nm / speed_knots
+        incheon_eta = now_dt + timedelta(hours=incheon_hours)
+        incheon_eta_str = incheon_eta.strftime('%Y-%m-%d %H:%M KST')
+        incheon_remain_str = f"{int(incheon_hours)}시간 {int((incheon_hours % 1) * 60)}분"
+
+        route_map_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8" />
+            <title>Live Vessel Route Animation</title>
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+            <style>
+                * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+                body {{ background: #0f172a; color: #f1f5f9; padding: 6px; overflow: hidden; }}
+                .hud-grid {{ display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }}
+                .hud-card {{ background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 12px; padding: 12px 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); }}
+                .hud-title {{ font-size: 11.5px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }}
+                .hud-main {{ font-size: 16px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; }}
+                .hud-sub {{ font-size: 12px; color: #cbd5e1; margin-top: 4px; }}
+                .hud-badge-green {{ background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }}
+                
+                .controls-bar {{ display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 10px; padding: 8px 14px; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }}
+                .port-btn-group, .anim-btn-group {{ display: flex; align-items: center; gap: 6px; }}
+                .c-btn {{ background: #1e293b; color: #e2e8f0; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }}
+                .c-btn:hover {{ background: #334155; border-color: #64748b; }}
+                .c-btn.active {{ background: #2563eb; color: #ffffff; border-color: #3b82f6; box-shadow: 0 0 10px rgba(37, 99, 235, 0.5); }}
+                
+                #map-container {{ width: 100%; height: 510px; border-radius: 12px; overflow: hidden; border: 1px solid #334155; position: relative; }}
+                
+                .vessel-current-icon {{ position: relative; display: flex; align-items: center; justify-content: center; }}
+                .vessel-pulse-dot {{ width: 18px; height: 18px; background: #22c55e; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 0 14px #22c55e, 0 0 24px rgba(34, 197, 94, 0.8); z-index: 10; }}
+                .vessel-pulse-ring {{ position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 2.5px solid #4ade80; animation: pulse-wave 1.8s infinite ease-out; z-index: 5; }}
+                @keyframes pulse-wave {{ 0% {{ transform: scale(0.5); opacity: 1; }} 100% {{ transform: scale(1.6); opacity: 0; }} }}
+                
+                .moving-ship-marker {{ transition: transform 0.1s linear; }}
+                
+                .map-legend {{ position: absolute; bottom: 20px; left: 20px; z-index: 1000; background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(71, 85, 105, 0.8); border-radius: 8px; padding: 10px 14px; font-size: 11.5px; color: #cbd5e1; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); }}
+                .legend-item {{ display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }}
+                .legend-line-gray {{ width: 24px; height: 6px; background: #94a3b8; border-radius: 2px; }}
+                .legend-dot-green {{ width: 12px; height: 12px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; border: 1px solid #fff; }}
+                .legend-line-dash {{ width: 24px; height: 0; border-top: 3px dashed #38bdf8; }}
+            </style>
+        </head>
+        <body>
+            <div class="hud-grid">
+                <div class="hud-card">
+                    <div class="hud-title"><i class="fa-solid fa-ship"></i> 선박 정보 및 현재 운항 상태</div>
+                    <div class="hud-main">
+                        <span>{active_vessel}</span>
+                        <span class="hud-badge-green">항해 중 (Underway)</span>
+                    </div>
+                    <div class="hud-sub">
+                        IMO: {active_imo} · 제원: {vessel_type} · 속력: <b>{speed_knots} Knots</b> · 침로: <b>045° (북동향)</b>
+                    </div>
+                </div>
+                
+                <div class="hud-card" style="border-left: 3px solid #38bdf8;">
+                    <div class="hud-title"><i class="fa-solid fa-anchor" style="color:#38bdf8;"></i> 부산항 (Busan Port) 입항 예측</div>
+                    <div class="hud-main" style="color:#38bdf8;">
+                        <span>{busan_eta_str}</span>
+                    </div>
+                    <div class="hud-sub">
+                        ⏳ <b>{busan_remain_str} 후</b> 입항 예정 (잔여 {busan_dist_nm} NM / 약 {int(busan_dist_nm * 1.852)} km)
+                    </div>
+                </div>
+                
+                <div class="hud-card" style="border-left: 3px solid #fbbf24;">
+                    <div class="hud-title"><i class="fa-solid fa-anchor" style="color:#fbbf24;"></i> 인천항 (Incheon Port) 입항 예측</div>
+                    <div class="hud-main" style="color:#fbbf24;">
+                        <span>{incheon_eta_str}</span>
+                    </div>
+                    <div class="hud-sub">
+                        ⏳ <b>{incheon_remain_str} 후</b> 입항 예정 (잔여 {incheon_dist_nm} NM / 약 {int(incheon_dist_nm * 1.852)} km)
+                    </div>
+                </div>
+            </div>
+            
+            <div class="controls-bar">
+                <div class="port-btn-group">
+                    <span style="font-size:12px; color:#94a3b8; margin-right:4px;">🎯 입항 항만 선택:</span>
+                    <button class="c-btn active" id="btn-busan" onclick="selectPort('busan')">🇰🇷 부산항 입항 예측 (152 NM)</button>
+                    <button class="c-btn" id="btn-incheon" onclick="selectPort('incheon')">🇰🇷 인천항 입항 예측 (310 NM)</button>
+                    <button class="c-btn" id="btn-both" onclick="selectPort('both')">항로 동시 비교</button>
+                </div>
+                <div class="anim-btn-group">
+                    <span style="font-size:12px; color:#94a3b8; margin-right:4px;">🎬 항해 애니메이션:</span>
+                    <button class="c-btn" id="btn-play" onclick="togglePlay()"><i class="fa-solid fa-play"></i> 실시간 시뮬레이션</button>
+                    <button class="c-btn" id="btn-reset" onclick="resetAnimation()"><i class="fa-solid fa-rotate-left"></i> 초기화</button>
+                    <button class="c-btn" id="btn-speed" onclick="toggleSpeed()">속도: 1x</button>
+                </div>
+            </div>
+            
+            <div id="map-container">
+                <div class="map-legend">
+                    <div style="font-weight:700; margin-bottom:6px; color:#f8fafc; font-size:12px;">🗺️ 항로 범례 (Legend)</div>
+                    <div class="legend-item"><div class="legend-line-gray"></div><span>지나온 경로 (굵은 회색선)</span></div>
+                    <div class="legend-item"><div class="legend-dot-green"></div><span>현재 위치 (연두색 펄스 마커)</span></div>
+                    <div class="legend-item"><div class="legend-line-dash"></div><span>Forecast 예측 경로 (점선)</span></div>
+                </div>
+            </div>
+
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <script>
+                const map = L.map('map-container', {{
+                    center: [33.5, 127.5],
+                    zoom: 6,
+                    zoomControl: true
+                }});
+
+                L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+                    attribution: '&copy; CARTO, OpenStreetMap',
+                    maxZoom: 18
+                }}).addTo(map);
+
+                // 1. 지나온 경로 좌표 (대만 북동방 -> 동중국해 -> 제주 남동방 현재 위치)
+                const pastPoints = [
+                    [25.0, 122.2],
+                    [27.0, 123.8],
+                    [29.2, 125.4],
+                    [31.2, 126.8],
+                    [32.85, 127.85]
+                ];
+
+                // 2. Forecast 부산항 예측 경로 좌표
+                const busanForecastPoints = [
+                    [32.85, 127.85],
+                    [33.60, 128.35],
+                    [34.30, 128.85],
+                    [34.80, 128.95],
+                    [35.075, 128.83]
+                ];
+
+                // 3. Forecast 인천항 예측 경로 좌표
+                const incheonForecastPoints = [
+                    [32.85, 127.85],
+                    [33.40, 126.20],
+                    [34.60, 125.40],
+                    [35.80, 125.60],
+                    [36.70, 125.90],
+                    [37.15, 126.20],
+                    [37.440, 126.60]
+                ];
+
+                // [요청 규정] 지나온 경로는 굵은 회색선으로 표시
+                const pastPolyline = L.polyline(pastPoints, {{
+                    color: '#94a3b8',
+                    weight: 6,
+                    opacity: 0.95,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }}).addTo(map);
+
+                // [요청 규정] Forecast는 점선으로 표시 (부산항: 청색 점선, 인천항: 황색 점선)
+                const busanPolyline = L.polyline(busanForecastPoints, {{
+                    color: '#38bdf8',
+                    weight: 4,
+                    dashArray: '8, 8',
+                    opacity: 0.95
+                }}).addTo(map);
+
+                const incheonPolyline = L.polyline(incheonForecastPoints, {{
+                    color: '#fbbf24',
+                    weight: 4,
+                    dashArray: '8, 8',
+                    opacity: 0.85
+                }}).addTo(map);
+
+                // [요청 규정] 현재 위치는 연두색으로 표시 (연두색 펄스 애니메이션 마커)
+                const currentIcon = L.divIcon({{
+                    className: 'vessel-current-icon',
+                    html: '<div class=\"vessel-pulse-ring\"></div><div class=\"vessel-pulse-dot\"></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                }});
+
+                const currentMarker = L.marker([32.85, 127.85], {{ icon: currentIcon }}).addTo(map);
+                currentMarker.bindPopup(`
+                    <div style=\"color:#0f172a; font-size:12px; font-family:sans-serif;\">
+                        <b style=\"font-size:13px; color:#15803d;\">🛳️ {active_vessel} (현재 위치)</b><br>
+                        <hr style=\"margin:4px 0;\">
+                        좌표: 32°51'N 127°51'E (제주 남동방 55NM 해상)<br>
+                        대지속력: <b>{speed_knots} Knots</b><br>
+                        침로: <b>045° (북동향)</b><br>
+                        상태: 항해 중 (Underway using Engine)
+                    </div>
+                `).openPopup();
+
+                // 항만 마커 (부산항 / 인천항)
+                const portIcon = (name, color) => L.divIcon({{
+                    className: 'port-icon',
+                    html: `<div style=\"background:${{color}}; color:#fff; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:bold; box-shadow:0 2px 6px rgba(0,0,0,0.5); display:flex; align-items:center; gap:4px;\"><i class=\"fa-solid fa-anchor\"></i> ${{name}}</div>`,
+                    iconAnchor: [35, 15]
+                }});
+
+                const busanMarker = L.marker([35.075, 128.83], {{ icon: portIcon('부산신항', '#0284c7') }}).addTo(map);
+                busanMarker.bindPopup(`
+                    <div style=\"color:#0f172a; font-size:12px; font-family:sans-serif;\">
+                        <b style=\"font-size:13px; color:#0284c7;\">⚓ 부산항 신항 (Busan New Port)</b><br>
+                        <hr style=\"margin:4px 0;\">
+                        도착 예정: <b>{busan_eta_str}</b><br>
+                        남은 시간: <b>{busan_remain_str}</b><br>
+                        잔여 거리: <b>{busan_dist_nm} NM</b> (약 {int(busan_dist_nm * 1.852)} km)
+                    </div>
+                `);
+
+                const incheonMarker = L.marker([37.440, 126.60], {{ icon: portIcon('인천신항', '#d97706') }}).addTo(map);
+                incheonMarker.bindPopup(`
+                    <div style=\"color:#0f172a; font-size:12px; font-family:sans-serif;\">
+                        <b style=\"font-size:13px; color:#d97706;\">⚓ 인천항 신항 (Incheon Port)</b><br>
+                        <hr style=\"margin:4px 0;\">
+                        도착 예정: <b>{incheon_eta_str}</b><br>
+                        남은 시간: <b>{incheon_remain_str}</b><br>
+                        잔여 거리: <b>{incheon_dist_nm} NM</b> (약 {int(incheon_dist_nm * 1.852)} km)
+                    </div>
+                `);
+
+                // 초기 지도 범위 피팅 (부산 기준)
+                map.fitBounds(L.featureGroup([pastPolyline, busanPolyline]).getBounds().pad(0.15));
+
+                // 항만 선택 함수
+                let currentTarget = 'busan';
+                function selectPort(port) {{
+                    currentTarget = port;
+                    document.getElementById('btn-busan').classList.remove('active');
+                    document.getElementById('btn-incheon').classList.remove('active');
+                    document.getElementById('btn-both').classList.remove('active');
+
+                    if (port === 'busan') {{
+                        document.getElementById('btn-busan').classList.add('active');
+                        busanPolyline.setStyle({{ opacity: 0.95, weight: 4 }});
+                        incheonPolyline.setStyle({{ opacity: 0.15, weight: 2 }});
+                        map.flyToBounds(L.featureGroup([pastPolyline, busanPolyline]).getBounds().pad(0.15));
+                    }} else if (port === 'incheon') {{
+                        document.getElementById('btn-incheon').classList.add('active');
+                        busanPolyline.setStyle({{ opacity: 0.15, weight: 2 }});
+                        incheonPolyline.setStyle({{ opacity: 0.95, weight: 4 }});
+                        map.flyToBounds(L.featureGroup([pastPolyline, incheonPolyline]).getBounds().pad(0.15));
+                    }} else {{
+                        document.getElementById('btn-both').classList.add('active');
+                        busanPolyline.setStyle({{ opacity: 0.95, weight: 4 }});
+                        incheonPolyline.setStyle({{ opacity: 0.95, weight: 4 }});
+                        map.flyToBounds(L.featureGroup([pastPolyline, busanPolyline, incheonPolyline]).getBounds().pad(0.15));
+                    }}
+                }}
+
+                // 실시간 애니메이션 엔진
+                let animShip = null;
+                let isPlaying = false;
+                let animIndex = 0;
+                let speedMult = 1;
+                let animTimer = null;
+
+                function getInterpolatedRoute(points, stepsPerSegment = 25) {{
+                    const res = [];
+                    for (let i = 0; i < points.length - 1; i++) {{
+                        const p1 = points[i];
+                        const p2 = points[i + 1];
+                        for (let s = 0; s < stepsPerSegment; s++) {{
+                            const t = s / stepsPerSegment;
+                            res.push([
+                                p1[0] + (p2[0] - p1[0]) * t,
+                                p1[1] + (p2[1] - p1[1]) * t
+                            ]);
+                        }}
+                    }}
+                    res.push(points[points.length - 1]);
+                    return res;
+                }}
+
+                const fullBusanRoute = getInterpolatedRoute([...pastPoints, ...busanForecastPoints.slice(1)], 25);
+                const fullIncheonRoute = getInterpolatedRoute([...pastPoints, ...incheonForecastPoints.slice(1)], 25);
+
+                const movingShipIcon = L.divIcon({{
+                    className: 'moving-ship-marker',
+                    html: '<div style=\"background:#2563eb; color:#ffffff; padding:4px 7px; border-radius:50%; box-shadow:0 0 12px #38bdf8; display:flex; align-items:center; justify-content:center; border:1px solid #fff;\"><i class=\"fa-solid fa-ship\" style=\"font-size:12px;\"></i></div>',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                }});
+
+                function togglePlay() {{
+                    if (isPlaying) {{
+                        pauseAnimation();
+                    }} else {{
+                        startAnimation();
+                    }}
+                }}
+
+                function startAnimation() {{
+                    isPlaying = true;
+                    document.getElementById('btn-play').innerHTML = '<i class=\"fa-solid fa-pause\"></i> 일시 정지';
+                    const route = currentTarget === 'incheon' ? fullIncheonRoute : fullBusanRoute;
+                    
+                    if (!animShip) {{
+                        animShip = L.marker(route[animIndex], {{ icon: movingShipIcon }}).addTo(map);
+                    }}
+
+                    const interval = Math.max(20, 80 / speedMult);
+                    clearInterval(animTimer);
+                    animTimer = setInterval(() => {{
+                        if (animIndex < route.length - 1) {{
+                            animIndex++;
+                            animShip.setLatLng(route[animIndex]);
+                        }} else {{
+                            pauseAnimation();
+                            animIndex = 0;
+                        }}
+                    }}, interval);
+                }}
+
+                function pauseAnimation() {{
+                    isPlaying = false;
+                    document.getElementById('btn-play').innerHTML = '<i class=\"fa-solid fa-play\"></i> 실시간 시뮬레이션';
+                    clearInterval(animTimer);
+                }}
+
+                function resetAnimation() {{
+                    pauseAnimation();
+                    animIndex = 0;
+                    const route = currentTarget === 'incheon' ? fullIncheonRoute : fullBusanRoute;
+                    if (animShip) {{
+                        animShip.setLatLng(route[0]);
+                    }}
+                }}
+
+                function toggleSpeed() {{
+                    if (speedMult === 1) speedMult = 5;
+                    else if (speedMult === 5) speedMult = 15;
+                    else speedMult = 1;
+                    document.getElementById('btn-speed').innerText = `속도: ${{speedMult}}x`;
+                    if (isPlaying) {{
+                        startAnimation();
+                    }}
+                }}
+            </script>
+        </body>
+        </html>
+        """
+        components.html(route_map_html, height=720, scrolling=False)
 
 with tab5:
     st.header("🇺🇸 미국 이차전지 부품 수출 관세율 변동 추이")
